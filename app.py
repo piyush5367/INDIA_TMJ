@@ -10,6 +10,7 @@ import time
 
 # Set up logging
 logging.basicConfig(filename="pdf_extraction.log", level=logging.INFO, format="%(asctime)s - %(message)s")
+logging.basicConfig(level=logging.DEBUG)
 
 # Precompile regex patterns
 advertisement_pattern = re.compile(r'(\d{5,})\s+\d{2}/\d{2}/\d{4}')
@@ -74,8 +75,8 @@ def extract_numbers_from_pdf(pdf_file, progress_bar):
                         for key in extracted_data:
                             extracted_data[key].extend(result[key])
                     
-                    # Update progress bar every 10 pages
-                    if (i + 1) % 10 == 0 or i == total_pages - 1:
+                    # Update progress bar every 5 pages or on the last page
+                    if (i + 1) % 5 == 0 or i == total_pages - 1:  # Update every 5 pages or on the last page
                         progress_bar.progress((i + 1) / total_pages)
                         st.text(f"Processing page {i + 1} of {total_pages}...")
     except Exception as e:
@@ -172,6 +173,7 @@ def main():
         progress_bar.empty()
 
     if st.button("🔄 Reset"):
+        logging.debug("Reset button clicked")
         st.experimental_rerun()
     
     # Footer with modern colors
