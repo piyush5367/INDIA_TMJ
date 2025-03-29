@@ -100,53 +100,52 @@ def save_to_excel(data_dict):
 def main():
     st.set_page_config(page_title="PDF Number Extractor", page_icon="📄", layout="wide", initial_sidebar_state="expanded")
     
-    # Header
+    # Apply modern theme with updated colors
     st.markdown(
         """
-        <div style='background-color: #f0f2f6; padding: 10px; border-radius: 5px;'>
-            <h1 style='text-align: center; color: #ff4b4b;'>INDIA TMJ</h1>
-            <p style='text-align: center; font-size: 18px;'>Extract numbers from PDF and download them as an Excel file.</p>
+        <style>
+        body {
+            background-color: #f8f9fa; /* Light gray background for a clean look */
+            color: #212529; /* Dark gray text for readability */
+            font-family: 'Arial', sans-serif; /* Modern font */
+        }
+        .stButton>button {
+            background-color: #007bff; /* Primary blue button */
+            color: white;
+            border-radius: 5px;
+            border: none;
+            padding: 8px 16px;
+        }
+        .stButton>button:hover {
+            background-color: #0056b3; /* Darker blue on hover */
+        }
+        .stProgress > div > div {
+            background-color: #28a745; /* Green progress bar */
+        }
+        hr {
+            border: 1px solid #dee2e6; /* Light gray horizontal line */
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Header with modern colors
+    st.markdown(
+        """
+        <div style='background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);'>
+            <h1 style='text-align: center; color: #007bff;'>INDIA TMJ</h1>
+            <p style='text-align: center; font-size: 18px; color: #6c757d;'>Extract numbers from PDF and download them as an Excel file.</p>
         </div>
         <hr>
         """,
         unsafe_allow_html=True,
     )
-    
-    # Sidebar for File Upload
-    with st.sidebar:
-        st.markdown("## Welcome to India TMJ 📄")
-        st.markdown(
-            """
-            This app helps you extract numbers from PDF files and download them as an Excel file.
-            1. Upload a PDF file.
-            2. Wait for the extraction process to complete.
-            3. Download the results as an Excel file.
-            """
-        )
-        st.markdown("### 📂 Upload File")
-        uploaded_file = st.file_uploader("Select a PDF file", type=["pdf"], label_visibility="collapsed")
-        
-        theme = st.sidebar.radio("🌗 Select Theme", ["Light", "Dark"])
-        if theme == "Dark":
-            st.markdown(
-                """
-                <style>
-                body { background-color: #121212; color: #ffffff; }
-                .stButton>button { background-color: #333; color: white; }
-                </style>
-                """,
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                """
-                <style>
-                body { background-color: #ffffff; color: #000000; }
-                </style>
-                """,
-                unsafe_allow_html=True,
-            )
-        
+
+    # File Upload Section
+    st.markdown("### 📂 Upload File")
+    uploaded_file = st.file_uploader("Select a PDF file", type=["pdf"], label_visibility="collapsed")
+
     if uploaded_file is not None:
         st.success(f"✅ Selected File: {uploaded_file.name}")
         
@@ -171,15 +170,15 @@ def main():
         
         # Reset progress bar
         progress_bar.empty()
-    
+
     if st.button("🔄 Reset"):
         st.experimental_rerun()
     
-    # Footer
+    # Footer with modern colors
     st.markdown(
         """
         <hr>
-        <p style='text-align: center; font-size: 12px; color: gray;'>Developed by Piyush</p>
+        <p style='text-align: center; font-size: 12px; color: #6c757d;'>Developed by Piyush</p>
         """,
         unsafe_allow_html=True,
     )
