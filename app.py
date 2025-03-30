@@ -11,7 +11,8 @@ PATTERNS = {
     'Advertisement': re.compile(r' (\d{5,})\s+\d{2}/\d{2}/\d{4}'),
     'Corrigenda': re.compile(r' (\d{5,})\s*[-—–]'),
     'RC': re.compile(r'^(\d+\s+){4}\d+$', re.MULTILINE),
-    'Renewal': re.compile(r'(Application No\s*(\d{5,})|(?<!\d)(\d{5,})(?!\d))')  # Updated pattern
+    'Renewal': re.compile(r'(Application No\s*(\d{5,})|(?<!\d)(\d{5,})(?!\d))')  
+    'PR Section' : re.complie(r' (\d{5, })\s*[-—–]', text)
 }
 
 def extract_section(text, start_marker, end_marker=None):
@@ -84,6 +85,13 @@ def extract_renewal_numbers(text):
             renewal_numbers.extend(extract_numbers(line, re.compile(r'Application No\s+(\d{5,})')))
     return list(set(renewal_numbers))
 
+def extract_pr_section_numbers(text):
+    pr_section_numbers = []
+    if "PR Section" in text:
+        matches = re.findall(r'(\d{6})\s*[-—–]', text)
+        pr_section_numbers.extend(matches)
+    return list(set(pr_section_numbers))
+
 def process_page(page):
     try:
         text = page.extract_text() or ""
@@ -92,6 +100,7 @@ def process_page(page):
             'Corrigenda': extract_corrigenda_numbers(text),
             'RC': extract_rc_numbers(text),
             'Renewal': extract_renewal_numbers(text)
+            'PR Section': extract_pr_section_numbers(text)
         }
     except Exception as e:
         st.error(f"Error processing page: {str(e)}")
