@@ -11,7 +11,7 @@ PATTERNS = {
     'Advertisement': re.compile(r' (\d{5,})\s+\d{2}/\d{2}/\d{4}'),
     'Corrigenda': re.compile(r' (\d{5,})\s*[-—–]'),
     'RC': re.compile(r'^(\d+\s+){4}\d+$', re.MULTILINE),
-    'Renewal': re.compile(r'(Application No\s*(\d{5,})\s*Class|(?<!\d)(\d{5,})(?!\d))')
+    'Renewal': re.compile(r'(Application No\s*(\d{5,})|(?<!\d)(\d{5,})(?!\d))')  # Updated pattern
 }
 
 def extract_section(text, start_marker, end_marker=None):
@@ -80,7 +80,8 @@ def extract_renewal_numbers(text):
             found_renewal_section = True
             continue
         if found_renewal_section:
-            renewal_numbers.extend(extract_numbers(line, PATTERNS['Renewal']))
+            renewal_numbers.extend(extract_numbers(line, re.compile(r'\b(\d{5,})\b')))
+            renewal_numbers.extend(extract_numbers(line, re.compile(r'Application No\s+(\d{5,})')))
     return list(set(renewal_numbers))
 
 def process_page(page):
@@ -230,28 +231,3 @@ if uploaded_file:
         progress_bar.empty()
         status_text.empty()
         st.success(f"✅ **Extraction Complete** ⏱️ Processed in {processing_time:.2f} seconds")
-        st.balloons()
-        tab_icons = {
-            'Advertisement': '📢',
-            'Corrigenda': '✏️',
-            'RC': '📄',
-            'Renewal': '🔄'
-        }
-        tabs = st.tabs([f"{tab_icons[cat]} {cat}" for cat in results.keys()])
-        for tab, (category, numbers) in zip(tabs, results.items()):
-            with tab:
-                if numbers:
-                    st.dataframe(pd.DataFrame(numbers, columns=[f"{category} Numbers"]), height=300, use_container_width=True)
-                    st.info(f"Found {len(numbers)} {category.lower()} numbers")
-                else:
-                    st.warning(f"No {category.lower()} numbers found")
-        st.markdown("---")
-        st.subheader("📥 Download Results")
-        excel_file = generate_excel(results)
-        st.download_button(
-            label="⬇️ Download Excel Report",
-            data=excel_file,
-            file_name="tmj_results.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            help="Download all extracted numbers in Excel format"
-        )
