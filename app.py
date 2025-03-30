@@ -9,7 +9,7 @@ from io import BytesIO
 # Precompile all regex patterns for performance
 PATTERNS = {
     'Advertisement': re.compile(r' (\d{5,})\s+\d{2}/\d{2}/\d{4}'),
-    'Corrigenda': re.compile(r' (\d{5,})\s*[-—–]'),  # Handles different dash types
+    'Corrigenda': re.compile(r' (\d{5,})\s*[-—–]'),
     'RC': re.compile(r'^(\d+\s+){4}\d+$', re.MULTILINE),
     'Renewal': re.compile(r'(?:Application No\s*(\d{5,})|(?<!\d)(\d{5,})(?!\d))')
 }
@@ -31,7 +31,7 @@ def extract_numbers(text, pattern, validation_func=None):
         num = match.group(1) if len(match.groups()) >= 1 else match.group(0)
         if not validation_func or validation_func(num):
             numbers.append(num)
-    return list(dict.fromkeys(numbers))  # Deduplicate while preserving order
+    return list(dict.fromkeys(numbers))
 
 def extract_advertisement_numbers(text):
     """Extracts advertisement numbers before the CORRIGENDA section"""
@@ -40,75 +40,58 @@ def extract_advertisement_numbers(text):
     
     for line in lines:
         line = line.strip()
-        
         if "CORRIGENDA" in line:
             break  
-        
         matches = re.findall(r'(\d{5,})\s+\d{2}/\d{2}/\d{4}', line)
         advertisement_numbers.extend(matches)  
-    
     return advertisement_numbers
 
 def extract_corrigenda_numbers(text):
     """Extract Corrigenda numbers from the CORRIGENDA section"""
-    
     corrigenda_numbers = []
     found_corrigenda_section = False
     lines = text.split("\n")
 
     for line in lines:
         line = line.strip()
-        
         if "CORRIGENDA" in line:
             found_corrigenda_section = True
             continue  
-        
         if "Following Trade Mark applications have been Registered and registration certificates are available on the official website" in line:
             break  
-        
         if found_corrigenda_section:
             matches = re.findall(r'(\d{5,})\s*[-–—]', line)
             corrigenda_numbers.extend(matches)  
-    
-    return list(set(corrigenda_numbers))  # Remove duplicates
-
+    return list(set(corrigenda_numbers))
 
 def extract_rc_numbers(text):
     """Extract RC numbers before the 'Following Trade Marks Registration Renewed' section"""
-    
     rc_numbers = []
     lines = text.split("\n")
 
     for line in lines:
         line = line.strip()
-        
         if "Following Trade Marks Registration Renewed for a Period Of Ten Years" in line:
             break
-        
         columns = line.split()
         if len(columns) == 5 and all(col.isdigit() for col in columns):
             rc_numbers.extend(columns)
-
     return list(set(rc_numbers))
 
 def extract_renewal_numbers(text):
     """Extract renewal numbers after 'Following Trade Marks Registration Renewed' section"""
-    
     renewal_numbers = []
     found_renewal_section = False
     lines = text.split("\n")
 
     for line in lines:
         line = line.strip()
-        
         if "Following Trade Marks Registration Renewed for a Period Of Ten Years" in line:
             found_renewal_section = True
             continue
-        
         if found_renewal_section:
             renewal_numbers.extend(extract_numbers(line, r'\b(\d{5,})\b'))
             renewal_numbers.extend(extract_numbers(line, r'Application No\s+(\d{5,})'))
-
     return list(set(renewal_numbers))
 
 def process_page(page):
@@ -145,15 +128,9 @@ def process_pdf(uploaded_file, progress_bar, status_text):
                             results[category].extend(numbers)
                     
                     if i % 5 == 0 or i == total_pages:
-                        elapsed = time.time() - start_time
                         progress = i / total_pages
-                        speed = i / elapsed
-                        eta = (total_pages - i) / speed if speed > 0 else 0
-                        
                         progress_bar.progress(progress)
-                        status_text.markdown(
-                            f"**Progress:** {progress:.1%} | "
-                        )
+                        status_text.markdown(f"**Progress:** {progress:.1%}")
             
             final_results = {}
             for category, numbers in results.items():
@@ -166,7 +143,6 @@ def process_pdf(uploaded_file, progress_bar, status_text):
                 except Exception as e:
                     st.error(f"Error processing {category}: {str(e)}")
                     final_results[category] = []
-            
             return final_results
     
     except Exception as e:
@@ -179,28 +155,26 @@ def generate_excel(data):
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         for category, numbers in data.items():
             df = pd.DataFrame(numbers, columns=['Numbers'])
-            df.to_excel(
-                writer,
-                sheet_name=category[:31],
-                index=False
-            )
-            
+            df.to_excel(writer, sheet_name=category[:31], index=False)
             worksheet = writer.sheets[category[:31]]
             worksheet.set_column('A:A', max(15, len(category) + 5))
-    
     return output.getvalue()
 
-# Streamlit UI Configuration with Saffron and Green Theme
+# ==============================================
+# STREAMLIT UI WITH SAFFRON AND GREEN THEME
+# ==============================================
+
 st.set_page_config(
-    page_title="INDIA TMJ",
+    page_title="INDIA TMJ Extractor",
     layout="centered",
     initial_sidebar_state="expanded",
     page_icon="🇮🇳"
 )
 
-# Saffron and Green CSS styling
+# Custom CSS with Saffron and Green theme
 st.markdown("""
     <style>
+        /* Color Variables */
         :root {
             --saffron: #FF9933;
             --saffron-light: #FFB366;
@@ -213,135 +187,96 @@ st.markdown("""
             --bg: #F5F5F5;
         }
         
-        body {
-            background-color: var(--bg);
-        }
-        
+        /* Main Title */
         .main-title {
             text-align: center;
             font-size: 2.5rem;
-            font-weight: 800;
+            font-weight: 700;
+            color: var(--saffron-dark);
             margin-bottom: 0.5rem;
             padding-top: 1rem;
-            color: var(--saffron-dark);
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
         }
         
+        /* Sub Title */
         .sub-title {
             text-align: center;
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             color: var(--text);
             margin-bottom: 2rem;
-            font-weight: 500;
         }
         
+        /* Progress Bar */
         .stProgress > div > div > div > div {
-            background: linear-gradient(90deg, var(--saffron), var(--saffron-dark));
+            background-color: var(--saffron) !important;
         }
         
+        /* Download Button */
         .stDownloadButton button {
-            width: 100%;
-            justify-content: center;
-            background: linear-gradient(90deg, var(--green), var(--green-dark));
-            color: var(--white);
-            border: none;
-            transition: all 0.3s;
-            font-weight: 600;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background-color: var(--green) !important;
+            color: white !important;
+            border: none !important;
+            transition: all 0.3s !important;
         }
-        
         .stDownloadButton button:hover {
-            background: linear-gradient(90deg, var(--green-light), var(--green));
+            background-color: var(--green-dark) !important;
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
         
-        .stTab button {
-            color: var(--text);
-            font-weight: 600;
-        }
-        
+        /* Tabs */
         .stTab button[aria-selected="true"] {
-            color: var(--saffron-dark);
-            border-bottom: 3px solid var(--saffron);
+            color: var(--saffron-dark) !important;
+            border-bottom: 3px solid var(--saffron) !important;
         }
         
+        /* File Uploader */
+        div.stFileUploader > div > div {
+            border: 2px dashed var(--saffron) !important;
+            border-radius: 8px;
+        }
+        
+        /* Alerts */
         .stAlert {
-            border-left: 4px solid var(--saffron);
+            border-left: 4px solid var(--saffron) !important;
         }
-        
-        .stDataFrame {
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            border-radius: 8px;
-        }
-        
-        .stFileUploader > div > div {
-            border: 2px dashed var(--saffron);
-            border-radius: 8px;
-            background-color: rgba(255, 153, 51, 0.05);
-        }
-        
-        .stSpinner > div > div {
-            border: 3px solid rgba(255, 153, 51, 0.2);
-            border-top: 3px solid var(--saffron);
-        }
-        
         .stSuccess {
-            background-color: rgba(19, 136, 8, 0.1) !important;
             border-left: 4px solid var(--green) !important;
         }
         
-        .stWarning {
-            background-color: rgba(255, 153, 51, 0.1) !important;
-            border-left: 4px solid var(--saffron) !important;
-        }
-        
-        .stError {
-            background-color: rgba(255, 51, 51, 0.1) !important;
-            border-left: 4px solid #FF3333 !important;
-        }
-        
-        .stInfo {
-            background-color: rgba(255, 153, 51, 0.1) !important;
-            border-left: 4px solid var(--saffron) !important;
-        }
-        
-        .stMarkdown {
-            margin-bottom: 1.5rem;
-        }
-        
-        .stButton button {
-            background-color: var(--saffron);
-            color: white;
-        }
-        
-        .stButton button:hover {
-            background-color: var(--saffron-dark);
-            color: white;
+        /* Spinner */
+        .stSpinner > div > div {
+            border-color: var(--saffron) !important;
         }
     </style>
 """, unsafe_allow_html=True)
 
-# Main App Interface with Indian Theme
+# Main App Interface
 st.markdown('<h1 class="main-title">🇮🇳 TRADEMARK JOURNAL EXTRACTOR</h1>', unsafe_allow_html=True)
-st.markdown('<p class="sub-title">Extract Application Numbers to Excel with National Colors</p>', unsafe_allow_html=True)
+st.markdown("""
+    <p class="sub-title">
+        Extract Application Numbers from TMJ PDFs and export to Excel<br>
+        <small>Official colors of India theme</small>
+    </p>
+""", unsafe_allow_html=True)
 
-# File uploader section with saffron border
+# File upload section
 uploaded_file = st.file_uploader(
     "📄 Upload TMJ PDF File",
     type=["pdf"],
-    help="For best results, use original PDF files (not scanned documents)"
+    help="Upload the Trademark Journal PDF file to extract application numbers"
 )
 
 if uploaded_file:
     file_size = len(uploaded_file.getvalue()) / (1024 * 1024)
-    st.info(f"**📁 File:** {uploaded_file.name} | **📏 Size:** {file_size:.2f} MB | **🔍 Ready to process**")
+    st.info(f"""
+        **📁 File:** {uploaded_file.name}  
+        **📏 Size:** {file_size:.2f} MB  
+        **🔄 Status:** Ready to process
+    """)
     
     progress_bar = st.progress(0)
     status_text = st.empty()
-    results_area = st.empty()
     
-    with st.spinner("⏳ Processing document with saffron power..."):
+    with st.spinner("🔍 Processing document with Indian colors..."):
         start_time = time.time()
         results = process_pdf(uploaded_file, progress_bar, status_text)
         processing_time = time.time() - start_time
@@ -350,31 +285,52 @@ if uploaded_file:
         progress_bar.empty()
         status_text.empty()
         
-        with results_area.container():
-            st.success(f"✅ **Success!** Extraction completed in {processing_time:.2f} seconds!")
-            st.balloons()
-            
-            tabs = st.tabs([f"📋 {cat}" for cat in results.keys()])
-            for tab, (category, numbers) in zip(tabs, results.items()):
-                with tab:
-                    if numbers:
-                        st.dataframe(
-                            pd.DataFrame(numbers, columns=[f"🔢 {category} Numbers"]),
-                            height=300,
-                            use_container_width=True
-                        )
-                        st.caption(f"🎯 Found {len(numbers)} {category.lower()} numbers")
-                    else:
-                        st.warning(f"⚠️ No {category.lower()} numbers found in this document")
-            
-            st.markdown("---")
-            st.subheader("💾 Download Results")
-            
-            excel_file = generate_excel(results)
-            st.download_button(
-                label="⬇️ Download Excel Report (Green for Go!)",
-                data=excel_file,
-                file_name="tmj_results.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                help="Click to download all extracted numbers in Excel format"
-            )
+        st.success(f"""
+            ✅ **Extraction Complete**  
+            ⏱️ Processed in {processing_time:.2f} seconds  
+            🇮🇳 Powered by Indian colors
+        """)
+        st.balloons()
+        
+        # Results tabs
+        tabs = st.tabs([f"📋 {cat}" for cat in results.keys()])
+        for tab, (category, numbers) in zip(tabs, results.items()):
+            with tab:
+                if numbers:
+                    st.dataframe(
+                        pd.DataFrame(numbers, columns=[f"{category} Numbers"]),
+                        height=300,
+                        use_container_width=True
+                    )
+                    st.info(f"Found {len(numbers)} {category.lower()} numbers")
+                else:
+                    st.warning(f"No {category.lower()} numbers found")
+        
+        # Download section
+        st.markdown("---")
+        st.subheader("📥 Download Results")
+        excel_file = generate_excel(results)
+        st.download_button(
+            label="⬇️ Download Excel Report (Green for Go!)",
+            data=excel_file,
+            file_name="tmj_results.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            help="Download all extracted numbers in Excel format"
+        )
+
+# Instructions and requirements
+st.markdown("---")
+st.markdown("""
+    ### 📝 Requirements:
+    1. Original TMJ PDF file (not scanned)
+    2. PDF should contain standard TMJ format
+    3. File size should be reasonable (<50MB recommended)
+    
+    ### 🔍 What this tool extracts:
+    - Advertisement numbers
+    - Corrigenda numbers  
+    - RC numbers
+    - Renewal numbers
+    
+    *Colors represent the Indian national flag theme*
+""")
