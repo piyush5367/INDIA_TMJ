@@ -12,134 +12,134 @@ def load_css():
     <style>
         /* ===== Modern UI Theme ===== */
         :root {
-          --primary: #4F46E5;       /* Indigo */
-          --primary-light: #818CF8;
-          --primary-dark: #4338CA;
-          --secondary: #10B981;     /* Emerald */
-          --danger: #EF4444;        /* Red */
-          --warning: #F59E0B;       /* Amber */
-          --background: #F9FAFB;    /* Gray-50 */
-          --card: #FFFFFF;          /* White */
-          --text: #111827;          /* Gray-900 */
-          --border: #E5E7EB;        /* Gray-200 */
+            --primary: #4F46E5;        /* Indigo */
+            --primary-light: #818CF8;
+            --primary-dark: #4338CA;
+            --secondary: #10B981;        /* Emerald */
+            --danger: #EF4444;          /* Red */
+            --warning: #F59E0B;         /* Amber */
+            --background: #F9FAFB;      /* Gray-50 */
+            --card: #FFFFFF;            /* White */
+            --text: #111827;            /* Gray-900 */
+            --border: #E5E7EB;          /* Gray-200 */
         }
 
         /* ===== Base Styles ===== */
         body {
-          background-color: var(--background);
-          color: var(--text);
-          font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--background);
+            color: var(--text);
+            font-family: 'Inter', system-ui, sans-serif;
         }
 
         /* ===== Main Container ===== */
         .stApp {
-          background-color: var(--background);
-          padding: 1rem;
+            background-color: var(--background);
+            padding: 1rem;
         }
 
         /* ===== Header Styles ===== */
         .main-title {
-          font-size: 2.5rem;
-          font-weight: 800;
-          background: linear-gradient(90deg, var(--primary), var(--primary-light));
-          -webkit-background-clip: text;
-          background-clip: text;
-          color: transparent;
-          text-align: center;
-          margin-bottom: 0.5rem;
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, var(--primary), var(--primary-light));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-align: center;
+            margin-bottom: 0.5rem;
         }
 
         .sub-title {
-          font-size: 1.1rem;
-          color: var(--text);
-          opacity: 0.8;
-          text-align: center;
-          margin-bottom: 2rem;
+            font-size: 1.1rem;
+            color: var(--text);
+            opacity: 0.8;
+            text-align: center;
+            margin-bottom: 2rem;
         }
 
         /* ===== Card & Container Styles ===== */
         .custom-card {
-          background: var(--card);
-          border-radius: 12px;
-          padding: 2rem;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-          margin-bottom: 1.5rem;
-          border: 1px solid var(--border);
+            background: var(--card);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
         }
 
         /* ===== Uploader Styles ===== */
         .stFileUploader > div {
-          border: 2px dashed var(--primary) !important;
-          border-radius: 12px !important;
-          background-color: rgba(79, 70, 229, 0.05) !important;
-          transition: all 0.3s ease !important;
+            border: 2px dashed var(--primary) !important;
+            border-radius: 12px !important;
+            background-color: rgba(79, 70, 229, 0.05) !important;
+            transition: all 0.3s ease !important;
         }
 
         .stFileUploader > div:hover {
-          border-color: var(--primary-dark) !important;
-          background-color: rgba(79, 70, 229, 0.1) !important;
+            border-color: var(--primary-dark) !important;
+            background-color: rgba(79, 70, 229, 0.1) !important;
         }
 
         /* ===== Button Styles ===== */
         .stButton > button {
-          background-color: var(--primary) !important;
-          color: white !important;
-          border: none !important;
-          border-radius: 8px !important;
-          padding: 0.5rem 1.5rem !important;
-          font-weight: 500 !important;
-          transition: all 0.2s ease !important;
+            background-color: var(--primary) !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 8px !important;
+            padding: 0.5rem 1.5rem !important;
+            font-weight: 500 !important;
+            transition: all 0.2s ease !important;
         }
 
         .stButton > button:hover {
-          background-color: var(--primary-dark) !important;
-          transform: translateY(-1px);
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            background-color: var(--primary-dark) !important;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
         /* ===== Progress Bar ===== */
         .stProgress > div > div > div {
-          background-color: var(--primary) !important;
+            background-color: var(--primary) !important;
         }
 
         /* ===== Tab Styles ===== */
         .stTabs [aria-selected="true"] {
-          color: var(--primary) !important;
-          font-weight: 600 !important;
-          border-bottom: 3px solid var(--primary) !important;
+            color: var(--primary) !important;
+            font-weight: 600 !important;
+            border-bottom: 3px solid var(--primary) !important;
         }
 
         /* ===== Alert/Message Styles ===== */
         .stAlert {
-          border-radius: 8px !important;
-          border-left: 4px solid var(--primary) !important;
+            border-radius: 8px !important;
+            border-left: 4px solid var(--primary) !important;
         }
 
         .stAlert.success {
-          border-left-color: var(--secondary) !important;
-          background-color: rgba(16, 185, 129, 0.1) !important;
+            border-left-color: var(--secondary) !important;
+            background-color: rgba(16, 185, 129, 0.1) !important;
         }
 
         .stAlert.error {
-          border-left-color: var(--danger) !important;
-          background-color: rgba(239, 68, 68, 0.1) !important;
+            border-left-color: var(--danger) !important;
+            background-color: rgba(239, 68, 68, 0.1) !important;
         }
 
         .stAlert.info {
-          border-left-color: var(--primary-light) !important;
-          background-color: rgba(129, 140, 248, 0.1) !important;
+            border-left-color: var(--primary-light) !important;
+            background-color: rgba(129, 140, 248, 0.1) !important;
         }
 
         /* ===== Data Table Styles ===== */
         .stDataFrame {
-          border-radius: 8px !important;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+            border-radius: 8px !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
         }
 
         /* ===== Spinner Styles ===== */
         .stSpinner > div {
-          border-color: var(--primary) !important;
-          border-right-color: transparent !important;
+            border-color: var(--primary) !important;
+            border-right-color: transparent !important;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -248,19 +248,19 @@ def process_pdf(uploaded_file, progress_bar, status_text):
                         progress = i / total_pages
                         progress_bar.progress(progress)
                         status_text.markdown(f"**Progress:** {progress:.1%} ({i}/{total_pages} pages)")
-            
-            # Clean and sort results
-            final_results = {}
-            for category, numbers in results.items():
-                try:
-                    cleaned = [str(n).strip() for n in numbers if str(n).strip()]
-                    numeric_strings = [n for n in cleaned if n.isdigit()]
-                    non_numeric_strings = [n for n in cleaned if not n.isdigit()]
-                    final_results[category] = sorted(numeric_strings, key=int) + sorted(non_numeric_strings)
-                except Exception as e:
-                    st.error(f"Error processing {category}: {str(e)}")
-                    final_results[category] = []
-            return final_results
+                
+                # Clean and sort results
+                final_results = {}
+                for category, numbers in results.items():
+                    try:
+                        cleaned = [str(n).strip() for n in numbers if str(n).strip()]
+                        numeric_strings = [n for n in cleaned if n.isdigit()]
+                        non_numeric_strings = [n for n in cleaned if not n.isdigit()]
+                        final_results[category] = sorted(numeric_strings, key=int) + sorted(non_numeric_strings)
+                    except Exception as e:
+                        st.error(f"Error processing {category}: {str(e)}")
+                        final_results[category] = []
+                return final_results
     except Exception as e:
         st.error(f"PDF processing failed: {str(e)}")
         return None
@@ -293,12 +293,12 @@ def display_results(data):
 
 # ===== Main App =====
 def main():
-    load_css()
     st.set_page_config(
         page_title="INDIA TMJ Extractor",
         layout="centered",
         initial_sidebar_state="expanded",
     )
+    load_css()
 
     with st.container():
         st.markdown('<h1 class="main-title">TRADEMARK JOURNAL EXTRACTOR</h1>', unsafe_allow_html=True)
