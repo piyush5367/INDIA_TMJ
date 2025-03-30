@@ -11,11 +11,10 @@ PATTERNS = {
     'Advertisement': re.compile(r' (\d{5,})\s+\d{2}/\d{2}/\d{4}'),
     'Corrigenda': re.compile(r' (\d{5,})\s*[-—–]'),
     'RC': re.compile(r'^(\d+\s+){4}\d+$', re.MULTILINE),
-    'Renewal': re.compile(r'(Application No\s*(\d{5,})\s*Class|(?<!\d)(\d{5,})(?!\d))') #corrected regex
+    'Renewal': re.compile(r'(Application No\s*(\d{5,})\s*Class|(?<!\d)(\d{5,})(?!\d))')
 }
 
 def extract_section(text, start_marker, end_marker=None):
-    """Efficiently extract text section between markers"""
     start = text.find(start_marker)
     if start == -1:
         return ""
@@ -25,7 +24,6 @@ def extract_section(text, start_marker, end_marker=None):
     return text[start:]
 
 def extract_numbers(text, pattern, validation_func=None):
-    """Generic number extraction with optional validation"""
     numbers = []
     for match in pattern.finditer(text):
         num = match.group(1) if len(match.groups()) >= 1 else match.group(0)
@@ -34,41 +32,35 @@ def extract_numbers(text, pattern, validation_func=None):
     return list(dict.fromkeys(numbers))
 
 def extract_advertisement_numbers(text):
-    """Extracts advertisement numbers before the CORRIGENDA section"""
     advertisement_numbers = []
     lines = text.split("\n")
-    
     for line in lines:
         line = line.strip()
         if "CORRIGENDA" in line:
-            break  
+            break
         matches = re.findall(r'(\d{5,})\s+\d{2}/\d{2}/\d{4}', line)
-        advertisement_numbers.extend(matches)  
+        advertisement_numbers.extend(matches)
     return advertisement_numbers
 
 def extract_corrigenda_numbers(text):
-    """Extract Corrigenda numbers from the CORRIGENDA section"""
     corrigenda_numbers = []
     found_corrigenda_section = False
     lines = text.split("\n")
-
     for line in lines:
         line = line.strip()
         if "CORRIGENDA" in line:
             found_corrigenda_section = True
-            continue  
+            continue
         if "Following Trade Mark applications have been Registered and registration certificates are available on the official website" in line:
-            break  
+            break
         if found_corrigenda_section:
             matches = re.findall(r'(\d{5,})\s*[-–—]', line)
-            corrigenda_numbers.extend(matches)  
+            corrigenda_numbers.extend(matches)
     return list(set(corrigenda_numbers))
 
 def extract_rc_numbers(text):
-    """Extract RC numbers before the 'Following Trade Mark applications have been Registered' section"""
     rc_numbers = []
     lines = text.split("\n")
-
     for line in lines:
         line = line.strip()
         if "Following Trade Marks Registration Renewed for a Period Of Ten Years" in line:
@@ -79,11 +71,9 @@ def extract_rc_numbers(text):
     return list(set(rc_numbers))
 
 def extract_renewal_numbers(text):
-    """Extract renewal numbers after 'Following Trade Marks Registration Renewed' section"""
     renewal_numbers = []
     found_renewal_section = False
     lines = text.split("\n")
-
     for line in lines:
         line = line.strip()
         if "Following Trade Marks Registration Renewed for a Period Of Ten Years" in line:
@@ -94,7 +84,6 @@ def extract_renewal_numbers(text):
     return list(set(renewal_numbers))
 
 def process_page(page):
-    """Process a single PDF page with error handling"""
     try:
         text = page.extract_text() or ""
         return {
@@ -108,48 +97,40 @@ def process_page(page):
         return None
 
 def process_pdf(uploaded_file, progress_bar, status_text):
-    """Main PDF processing function with parallel execution"""
     results = {category: [] for category in PATTERNS.keys()}
-    
     try:
         with pdfplumber.open(uploaded_file) as pdf:
             total_pages = len(pdf.pages)
             start_time = time.time()
-            
             workers = min(8, max(4, total_pages // 10))
-            
             with ThreadPoolExecutor(max_workers=workers) as executor:
                 futures = [executor.submit(process_page, page) for page in pdf.pages]
-                
                 for i, future in enumerate(as_completed(futures), 1):
                     if (page_result := future.result()):
                         for category, numbers in page_result.items():
                             results[category].extend(numbers)
-                    
                     if i % 5 == 0 or i == total_pages:
                         progress = i / total_pages
                         progress_bar.progress(progress)
                         status_text.markdown(f"**Progress:** {progress:.1%}")
-            
             final_results = {}
             for category, numbers in results.items():
                 try:
                     cleaned = [str(n).strip() for n in numbers if str(n).strip()]
-                    final_results[category] = sorted(
-                        list(set(cleaned)),
-                        key=lambda x: int(x) if x.isdigit() else x
-                    )
+                    numeric_strings = [n for n in cleaned if n.isdigit()]
+                    non_numeric_strings = [n for n in cleaned if not n.isdigit()]
+                    sorted_numeric = sorted(numeric_strings, key=int)
+                    sorted_non_numeric = sorted(non_numeric_strings)
+                    final_results[category] = sorted_numeric + sorted_non_numeric
                 except Exception as e:
                     st.error(f"Error processing {category}: {str(e)}")
                     final_results[category] = []
             return final_results
-    
     except Exception as e:
         st.error(f"PDF processing failed: {str(e)}")
         return None
 
 def generate_excel(data):
-    """Generate Excel file with multiple sheets"""
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         for category, numbers in data.items():
@@ -159,20 +140,14 @@ def generate_excel(data):
             worksheet.set_column('A:A', max(15, len(category) + 5))
     return output.getvalue()
 
-# ==============================================
-# STREAMLIT UI WITH SAFFRON AND GREEN THEME
-# ==============================================
-
 st.set_page_config(
     page_title="INDIA TMJ Extractor",
     layout="centered",
     initial_sidebar_state="expanded",
 )
 
-# Custom CSS with Saffron and Green theme
 st.markdown("""
     <style>
-        /* Color Variables */
         :root {
             --saffron: #FF9933;
             --saffron-light: #FFB366;
@@ -184,8 +159,6 @@ st.markdown("""
             --text: #333333;
             --bg: #F5F5F5;
         }
-        
-        /* Main Title */
         .main-title {
             text-align: center;
             font-size: 2.5rem;
@@ -194,21 +167,15 @@ st.markdown("""
             margin-bottom: 0.5rem;
             padding-top: 1rem;
         }
-        
-        /* Sub Title */
         .sub-title {
             text-align: center;
             font-size: 1.1rem;
             color: var(--text);
             margin-bottom: 2rem;
         }
-        
-        /* Progress Bar */
         .stProgress > div > div > div > div {
             background-color: var(--saffron) !important;
         }
-        
-        /* Download Button */
         .stDownloadButton button {
             background-color: var(--green) !important;
             color: white !important;
@@ -219,35 +186,26 @@ st.markdown("""
             background-color: var(--green-dark) !important;
             transform: translateY(-2px);
         }
-        
-        /* Tabs */
         .stTab button[aria-selected="true"] {
             color: var(--saffron-dark) !important;
             border-bottom: 3px solid var(--saffron) !important;
         }
-        
-        /* File Uploader */
         div.stFileUploader > div > div {
             border: 2px dashed var(--saffron) !important;
             border-radius: 8px;
         }
-        
-        /* Alerts */
         .stAlert {
             border-left: 4px solid var(--saffron) !important;
         }
         .stSuccess {
             border-left: 4px solid var(--green) !important;
         }
-        
-        /* Spinner */
         .stSpinner > div > div {
             border-color: var(--saffron) !important;
         }
     </style>
 """, unsafe_allow_html=True)
 
-# Main App Interface
 st.markdown('<h1 class="main-title">TRADEMARK JOURNAL EXTRACTOR</h1>', unsafe_allow_html=True)
 st.markdown("""
     <p class="sub-title">
@@ -255,7 +213,6 @@ st.markdown("""
     </p>
 """, unsafe_allow_html=True)
 
-# File upload section
 uploaded_file = st.file_uploader(
     "📄 Upload TMJ PDF File",
     type=["pdf"],
@@ -263,53 +220,36 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file:
-    st.info(f"**📁 File:** {uploaded_file.name}")
-    
     progress_bar = st.progress(0)
     status_text = st.empty()
-    
     with st.spinner("🔍 Processing PDF"):
         start_time = time.time()
         results = process_pdf(uploaded_file, progress_bar, status_text)
         processing_time = time.time() - start_time
-    
     if results:
         progress_bar.empty()
         status_text.empty()
-        
-        st.success(f"""
-            ✅ **Extraction Complete** ⏱️ Processed in {processing_time:.2f} seconds  
-            🇮🇳 Powered by Indian colors
-        """)
+        st.success(f"✅ **Extraction Complete** ⏱️ Processed in {processing_time:.2f} seconds")
         st.balloons()
-        
-        # Results tabs with different icons for each category
         tab_icons = {
             'Advertisement': '📢',
             'Corrigenda': '✏️',
             'RC': '📄',
             'Renewal': '🔄'
         }
-        
         tabs = st.tabs([f"{tab_icons[cat]} {cat}" for cat in results.keys()])
         for tab, (category, numbers) in zip(tabs, results.items()):
             with tab:
                 if numbers:
-                    st.dataframe(
-                        pd.DataFrame(numbers, columns=[f"{category} Numbers"]),
-                        height=300,
-                        use_container_width=True
-                    )
+                    st.dataframe(pd.DataFrame(numbers, columns=[f"{category} Numbers"]), height=300, use_container_width=True)
                     st.info(f"Found {len(numbers)} {category.lower()} numbers")
                 else:
                     st.warning(f"No {category.lower()} numbers found")
-        
-        # Download section
         st.markdown("---")
         st.subheader("📥 Download Results")
         excel_file = generate_excel(results)
         st.download_button(
-            label="⬇️ Download Excel Report ",
+            label="⬇️ Download Excel Report",
             data=excel_file,
             file_name="tmj_results.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
