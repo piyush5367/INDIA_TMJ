@@ -109,7 +109,7 @@ def extract_from_pdf(pdf_file, progress_bar, status_text):
 def main():
     """Main function to run the Streamlit application."""
     st.set_page_config(page_title="PDF Extractor", page_icon="📄", layout="wide")
-    st.markdown("<h1 style='text-align: center; color: #FF4B4B;'>INDIA TMJ PDF Extractor</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #FF4B4B;'>INDIA TMJ</h1>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align: center; color: #4CAF50;'>Extract Numbers from PDF</h2>", unsafe_allow_html=True)
 
     uploaded_file = st.file_uploader("Upload PDF", type=["pdf"])
