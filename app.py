@@ -170,16 +170,8 @@ def main():
         layout="centered"
     )
     
-    st.title("🇮🇳 India TMJ PDF Extractor")
-    st.markdown("""
-        Extract numbers from Trade Marks Journal PDFs and export to Excel.
-        Supported number types:
-        - **Advertisement** - Application advertisement numbers
-        - **Corrigenda** - Correction notices
-        - **RC** - Registration certificates
-        - **Renewal** - Renewal notices
-    """)
-    
+    st.title("India TMJ PDF Extractor")
+
     uploaded_file = st.file_uploader(
         "Upload a Trade Marks Journal PDF file", 
         type="pdf",
