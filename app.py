@@ -77,42 +77,39 @@ def extract_rc_numbers(text):
     """Extract RC numbers before the 'Following Trade Marks Registration Renewed' section"""
     
     rc_numbers = []
-    lines = text.split("\n")  # Fixed syntax error
+    lines = text.split("\n")
 
     for line in lines:
-        line = line.strip()  # Fixed syntax error
+        line = line.strip()
         
         if "Following Trade Marks Registration Renewed for a Period Of Ten Years" in line:
-            break  # Stop when this section starts
+            break
         
-        columns = line.split()  # Fixed syntax error
+        columns = line.split()
         if len(columns) == 5 and all(col.isdigit() for col in columns):
-            rc_numbers.extend(columns)  # Extract numbers
+            rc_numbers.extend(columns)
 
-    return list(set(rc_numbers))  # Remove duplicates
+    return list(set(rc_numbers))
 
-# Function to extract renewal numbers
 def extract_renewal_numbers(text):
     """Extract renewal numbers after 'Following Trade Marks Registration Renewed' section"""
     
     renewal_numbers = []
     found_renewal_section = False
-    lines = text.split("\n")  # Split the text into lines
+    lines = text.split("\n")
 
     for line in lines:
-        line = line.strip()  # Clean up the line
+        line = line.strip()
         
         if "Following Trade Marks Registration Renewed for a Period Of Ten Years" in line:
             found_renewal_section = True
-            continue  # Skip to next line after finding the start of the section
+            continue
         
         if found_renewal_section:
-            # Extract renewal numbers based on patterns
-            renewal_numbers.extend(extract_numbers(line, r'\b(\d{5,})\b'))  # Match 5+ digit numbers
-            renewal_numbers.extend(extract_numbers(line, r'Application No\s+(\d{5,})'))  # Match 'Application No' followed by 5+ digit numbers
+            renewal_numbers.extend(extract_numbers(line, r'\b(\d{5,})\b'))
+            renewal_numbers.extend(extract_numbers(line, r'Application No\s+(\d{5,})'))
 
-    return list(set(renewal_numbers))  # Remove duplicates by converting to set and back to list
-
+    return list(set(renewal_numbers))
 
 def process_page(page):
     """Process a single PDF page with error handling"""
@@ -137,7 +134,6 @@ def process_pdf(uploaded_file, progress_bar, status_text):
             total_pages = len(pdf.pages)
             start_time = time.time()
             
-            # Dynamic worker count based on document size
             workers = min(8, max(4, total_pages // 10))
             
             with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -148,7 +144,6 @@ def process_pdf(uploaded_file, progress_bar, status_text):
                         for category, numbers in page_result.items():
                             results[category].extend(numbers)
                     
-                    # Update progress every 5 pages or on last page
                     if i % 5 == 0 or i == total_pages:
                         elapsed = time.time() - start_time
                         progress = i / total_pages
@@ -160,11 +155,9 @@ def process_pdf(uploaded_file, progress_bar, status_text):
                             f"**Progress:** {progress:.1%} | "
                         )
             
-            # Final processing and validation
             final_results = {}
             for category, numbers in results.items():
                 try:
-                    # Clean and sort numbers
                     cleaned = [str(n).strip() for n in numbers if str(n).strip()]
                     final_results[category] = sorted(
                         list(set(cleaned)),
@@ -188,11 +181,10 @@ def generate_excel(data):
             df = pd.DataFrame(numbers, columns=['Numbers'])
             df.to_excel(
                 writer,
-                sheet_name=category[:31],  # Excel sheet name limit
+                sheet_name=category[:31],
                 index=False
             )
             
-            # Auto-adjust column width
             worksheet = writer.sheets[category[:31]]
             worksheet.set_column('A:A', max(15, len(category) + 5))
     
@@ -202,29 +194,68 @@ def generate_excel(data):
 st.set_page_config(
     page_title="INDIA TMJ",
     layout="centered",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    page_icon="📄"
 )
 
-# Custom CSS for better appearance
+# Modern CSS styling
 st.markdown("""
     <style>
+        .main-title {
+            text-align: center;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #1f77b4;
+            margin-bottom: 0.5rem;
+            padding-top: 1rem;
+        }
+        .sub-title {
+            text-align: center;
+            font-size: 1.1rem;
+            color: #4a4a4a;
+            margin-bottom: 2rem;
+            font-weight: 400;
+        }
         .stProgress > div > div > div > div {
             background-color: #1f77b4;
         }
         .stDownloadButton button {
             width: 100%;
             justify-content: center;
+            background-color: #1f77b4;
+            color: white;
+            border: none;
+            transition: all 0.3s;
+        }
+        .stDownloadButton button:hover {
+            background-color: #1668a8;
+            transform: scale(1.02);
         }
         .st-emotion-cache-1v0mbdj img {
             margin: auto;
+        }
+        .stMarkdown {
+            margin-bottom: 1.5rem;
+        }
+        .stTab {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .stTab > div > div > div > div {
+            border-radius: 8px 8px 0 0;
+        }
+        .stDataFrame {
+            border-radius: 0 0 8px 8px;
+        }
+        .stAlert {
+            border-radius: 8px;
         }
     </style>
 """, unsafe_allow_html=True)
 
 # Main App Interface
-st.title("TRADEMARK")
-st.markdown("""Application No in Excel
-""")
+st.markdown('<h1 class="main-title">TRADEMARK JOURNAL EXTRACTOR</h1>', unsafe_allow_html=True)
+st.markdown('<p class="sub-title">Extract Application Numbers to Excel Automatically</p>', unsafe_allow_html=True)
 
 uploaded_file = st.file_uploader(
     "Upload TMJ PDF file",
@@ -233,11 +264,9 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file:
-    # Display file info
-    file_size = len(uploaded_file.getvalue()) / (1024 * 1024)  # in MB
+    file_size = len(uploaded_file.getvalue()) / (1024 * 1024)
     st.info(f"**File:** {uploaded_file.name} | **Size:** {file_size:.2f} MB")
     
-    # Initialize processing
     progress_bar = st.progress(0)
     status_text = st.empty()
     results_area = st.empty()
@@ -255,7 +284,6 @@ if uploaded_file:
             st.success(f"✅ Extraction completed in {processing_time:.2f} seconds!")
             st.balloons()
             
-            # Show preview in tabs
             tabs = st.tabs(list(results.keys()))
             for tab, (category, numbers) in zip(tabs, results.items()):
                 with tab:
@@ -269,13 +297,12 @@ if uploaded_file:
                     else:
                         st.warning(f"No {category} numbers found")
             
-            # Generate and download Excel
             st.markdown("---")
             st.subheader("Download Results")
             
             excel_file = generate_excel(results)
             st.download_button(
-                label="⬇️ Download Excel File",
+                label="⬇️ Download Excel Report",
                 data=excel_file,
                 file_name="tmj_results.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
