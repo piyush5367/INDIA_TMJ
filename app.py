@@ -90,14 +90,18 @@ def process_page(page):
 
 def extract_numbers_from_pdf(pdf_file, progress_bar, status_text):
     extracted_data = {"Advertisement": [], "Corrigenda": [], "RC": [], "Renewal": []}
+    stop_flag = st.session_state.get("stop_flag", False)
     try:
         with pdfplumber.open(pdf_file) as pdf:
             total_pages = len(pdf.pages)
             processed_pages = 0
             progress_bar.progress(0)
-            with ThreadPoolExecutor(max_workers=4) as executor:
+            with ThreadPoolExecutor(max_workers=8) as executor:  # Increased workers for performance
                 futures = {executor.submit(process_page, page): i for i, page in enumerate(pdf.pages)}
                 for future in as_completed(futures):
+                    if st.session_state.get("stop_flag", False):
+                        st.warning("⚠️ Process Stopped by User")
+                        return None
                     try:
                         result = future.result()
                         if result:
@@ -105,7 +109,7 @@ def extract_numbers_from_pdf(pdf_file, progress_bar, status_text):
                                 extracted_data[key].extend(result[key])
                         processed_pages += 1
                         progress_value = processed_pages / total_pages
-                        progress_bar.progress(progress_value)
+                        progress_bar.progress(min(progress_value, 0.99))  # Smoother progress updates
                         status_text.markdown(f"<h4 style='text-align: center; color: #FFA500;'>Processed {processed_pages}/{total_pages} pages...</h4>", unsafe_allow_html=True)
                     except Exception as e:
                         logging.error(f"Error processing page {futures[future]}: {str(e)}")
@@ -121,12 +125,19 @@ def main():
     st.markdown("<h1 style='text-align: center; color: #FF4B4B;'>INDIA TMJ</h1>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align: center; color: #4CAF50;'>Extract Numbers from PDFs</h2>", unsafe_allow_html=True)
     uploaded_file = st.file_uploader("📄 Upload a PDF", type=["pdf"])
+    if "stop_flag" not in st.session_state:
+        st.session_state["stop_flag"] = False
     if uploaded_file:
-        progress_bar = st.progress(0)
-        status_text = st.empty()
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+        with col2:
+            if st.button("❌ Cancel Processing"):
+                st.session_state["stop_flag"] = True
         with st.spinner("🔄 Processing PDF..."):
             extracted_data = extract_numbers_from_pdf(uploaded_file, progress_bar, status_text)
-        if extracted_data and any(extracted_data.values()):
+        if extracted_data and any(len(v) > 0 for v in extracted_data.values()):
             st.success("✅ Extraction Completed!")
             st.markdown("<h3 style='text-align: center; color: #4CAF50;'>Preview Extracted Data</h3>", unsafe_allow_html=True)
             selected_section = st.selectbox("Select a Section", list(extracted_data.keys()))
