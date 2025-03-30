@@ -34,45 +34,90 @@ def extract_numbers(text, pattern, validation_func=None):
     return list(dict.fromkeys(numbers))  # Deduplicate while preserving order
 
 def extract_advertisement_numbers(text):
-    """Extract advertisement numbers with validation"""
-    section = extract_section(text, "", "CORRIGENDA")
-    return extract_numbers(section, PATTERNS['Advertisement'], lambda x: len(x) >= 5)
+    """Extracts advertisement numbers before the CORRIGENDA section"""
+    advertisement_numbers = []
+    lines = text.split("\n")
+    
+    for line in lines:
+        line = line.strip()
+        
+        if "CORRIGENDA" in line:
+            break  
+        
+        matches = re.findall(r'(\d{5,})\s+\d{2}/\d{2}/\d{4}', line)
+        advertisement_numbers.extend(matches)  
+    
+    return advertisement_numbers
 
 def extract_corrigenda_numbers(text):
-    """Robust Corrigenda numbers extraction with multiple patterns"""
-    section = extract_section(text, "CORRIGENDA", "Following Trade Mark applications have been Registered")
-    numbers = []
-    for line in section.split('\n'):
+    """Extract Corrigenda numbers from the CORRIGENDA section"""
+    
+    corrigenda_numbers = []
+    found_corrigenda_section = False
+    lines = text.split("\n")
+
+    for line in lines:
         line = line.strip()
-        # Try multiple patterns
-        for pattern in [
-            r' (\d{5,})\s*[-—–]\s*',  # Standard pattern
-            r' (\d{5,})\s*$'           # Fallback for numbers at line end
-        ]:
-            if match := re.search(pattern, line):
-                numbers.append(match.group(1))
-                break  # Use first match only
-    return list(dict.fromkeys(numbers))
+        
+        if "CORRIGENDA" in line:
+            found_corrigenda_section = True
+            continue  
+        
+        if "Following Trade Mark applications have been Registered and registration certificates are available on the official website" in line:
+            break  
+        
+        if found_corrigenda_section:
+            matches = re.findall(r'(\d{5,})\s*[-–—]', line)
+            corrigenda_numbers.extend(matches)  
+    
+    return list(set(corrigenda_numbers))  # Remove duplicates
+
 
 def extract_rc_numbers(text):
-    """Extract RC numbers with validation"""
-    section = extract_section(text, "", "Following Trade Marks Registration Renewed")
-    numbers = []
-    for line in section.split('\n'):
-        cols = line.split()
-        if len(cols) == 5 and all(col.isdigit() for col in cols):
-            numbers.extend(cols)
-    return list(dict.fromkeys(numbers))
+    """Extract RC numbers before the 'Following Trade Marks Registration Renewed' section"""
+    
+    rc_numbers = []
+    lines = text.split("\n")  # Fixed syntax error
 
+    for line in lines:
+        line = line.strip()  # Fixed syntax error
+        
+        if "Following Trade Marks Registration Renewed for a Period Of Ten Years" in line:
+            break  # Stop when this section starts
+        
+        columns = line.split()  # Fixed syntax error
+        if len(columns) == 5 and all(col.isdigit() for col in columns):
+            rc_numbers.extend(columns)  # Extract numbers
+
+    return list(set(rc_numbers))  # Remove duplicates
+
+# Function to extract numbers based on a pattern
+def extract_numbers(line, pattern):
+    """Helper function to extract numbers from a line based on a given pattern"""
+    return re.findall(pattern, line)
+
+# Function to extract renewal numbers
 def extract_renewal_numbers(text):
-    """Extract renewal numbers with validation"""
-    section = extract_section(text, "Following Trade Marks Registration Renewed")
-    numbers = []
-    for match in PATTERNS['Renewal'].finditer(section):
-        for group in match.groups():
-            if group and len(group) >= 5:
-                numbers.append(group)
-    return list(dict.fromkeys(numbers))
+    """Extract renewal numbers after 'Following Trade Marks Registration Renewed' section"""
+    
+    renewal_numbers = []
+    found_renewal_section = False
+    lines = text.split("\n")  # Split the text into lines
+
+    for line in lines:
+        line = line.strip()  # Clean up the line
+        
+        if "Following Trade Marks Registration Renewed for a Period Of Ten Years" in line:
+            found_renewal_section = True
+            continue  # Skip to next line after finding the start of the section
+        
+        if found_renewal_section:
+            # Extract renewal numbers based on patterns
+            renewal_numbers.extend(extract_numbers(line, r'\b(\d{5,})\b'))  # Match 5+ digit numbers
+            renewal_numbers.extend(extract_numbers(line, r'Application No\s+(\d{5,})'))  # Match 'Application No' followed by 5+ digit numbers
+
+    return list(set(renewal_numbers))  # Remove duplicates by converting to set and back to list
+
 
 def process_page(page):
     """Process a single PDF page with error handling"""
