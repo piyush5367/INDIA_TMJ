@@ -4,11 +4,12 @@ import pdfplumber
 import pandas as pd
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
 
 # Logging setup
 logging.basicConfig(filename="pdf_extraction.log", level=logging.DEBUG, format="%(asctime)s - %(message)s")
 
-# Regex patterns
+# Precompile regex patterns
 advertisement_pattern = re.compile(r' (\d{5,})\s+\d{2}/\d{2}/\d{4}')
 corrigenda_pattern = re.compile(r' (\d{5,})\s*[--]')
 rc_pattern = re.compile(r'\b(\d{7})\b')
@@ -81,6 +82,7 @@ def process_page(page):
 def extract_from_pdf(pdf_file, progress_bar, status_text):
     """Extracts numbers from a PDF file using multithreading."""
     data = {"Advertisement": [], "Corrigenda": [], "RC": [], "Renewal": []}
+    start_time = time.time()
     try:
         with pdfplumber.open(pdf_file) as pdf:
             pages = pdf.pages
@@ -92,8 +94,11 @@ def extract_from_pdf(pdf_file, progress_bar, status_text):
                     if result:
                         for key, values in result.items():
                             data[key].extend(values)
+                    elapsed_time = time.time() - start_time
+                    remaining_pages = total_pages - (i + 1)
+                    estimated_time_remaining = (elapsed_time / (i + 1)) * remaining_pages if (i+1) else 0
+                    status_text.markdown(f"<h4 style='text-align: center; color: #FFA500;'>Processed {i + 1}/{total_pages} pages...<br>Time Remaining: {estimated_time_remaining:.2f} seconds</h4>", unsafe_allow_html=True)
                     progress_bar.progress((i + 1) / total_pages)
-                    status_text.markdown(f"<h4 style='text-align: center; color: #FFA500;'>Processed {i + 1}/{total_pages} pages...</h4>", unsafe_allow_html=True)
             progress_bar.progress(1.0)
             return data
     except Exception as e:
@@ -104,7 +109,7 @@ def extract_from_pdf(pdf_file, progress_bar, status_text):
 def main():
     """Main function to run the Streamlit application."""
     st.set_page_config(page_title="PDF Extractor", page_icon="📄", layout="wide")
-    st.markdown("<h1 style='text-align: center; color: #FF4B4B;'>INDIA TMJ</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #FF4B4B;'>INDIA TMJ PDF Extractor</h1>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align: center; color: #4CAF50;'>Extract Numbers from PDF</h2>", unsafe_allow_html=True)
 
     uploaded_file = st.file_uploader("Upload PDF", type=["pdf"])
@@ -131,3 +136,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
