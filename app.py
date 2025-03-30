@@ -11,7 +11,7 @@ PATTERNS = {
     'Advertisement': re.compile(r' (\d{5,})\s+\d{2}/\d{2}/\d{4}'),
     'Corrigenda': re.compile(r' (\d{5,})\s*[-—–]'),
     'RC': re.compile(r'^(\d+\s+){4}\d+$', re.MULTILINE),
-    'Renewal': re.compile(r'(?:Application No\s*(\d{5,})|(?<!\d)(\d{5,})(?!\d))')
+    "Renewal" re.compile(r'(Application No\s*(\d{5,})\s*Class|(\d)(\d{5,})(\d))')
 }
 
 def extract_section(text, start_marker, end_marker=None):
@@ -65,7 +65,7 @@ def extract_corrigenda_numbers(text):
     return list(set(corrigenda_numbers))
 
 def extract_rc_numbers(text):
-    """Extract RC numbers before the 'Following Trade Marks Registration Renewed' section"""
+    """Extract RC numbers before the 'Following Trade Mark applications have been Registered' section"""
     rc_numbers = []
     lines = text.split("\n")
 
@@ -91,7 +91,7 @@ def extract_renewal_numbers(text):
             continue
         if found_renewal_section:
             renewal_numbers.extend(extract_numbers(line, r'\b(\d{5,})\b'))
-            renewal_numbers.extend(extract_numbers(line, r'Application No\s+(\d{5,})'))
+            renewal_numbers.extend(extract_numbers(line, r'Application No\s+(\d{5,})\s+Class'))
     return list(set(renewal_numbers))
 
 def process_page(page):
@@ -265,12 +265,7 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file:
-    file_size = len(uploaded_file.getvalue()) / (1024 * 1024)
-    st.info(f"""
-        **📁 File:** {uploaded_file.name}  
-        **📏 Size:** {file_size:.2f} MB  
-        **🔄 Status:** Ready to process
-    """)
+    st.info(f"**📁 File:** {uploaded_file.name}")
     
     progress_bar = st.progress(0)
     status_text = st.empty()
@@ -291,8 +286,15 @@ if uploaded_file:
         """)
         st.balloons()
         
-        # Results tabs
-        tabs = st.tabs([f"📋 {cat}" for cat in results.keys()])
+        # Results tabs with different icons for each category
+        tab_icons = {
+            'Advertisement': '📢',
+            'Corrigenda': '✏️',
+            'RC': '📄',
+            'Renewal': '🔄'
+        }
+        
+        tabs = st.tabs([f"{tab_icons[cat]} {cat}" for cat in results.keys()])
         for tab, (category, numbers) in zip(tabs, results.items()):
             with tab:
                 if numbers:
@@ -316,20 +318,3 @@ if uploaded_file:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             help="Download all extracted numbers in Excel format"
         )
-
-# Instructions and requirements
-st.markdown("---")
-st.markdown("""
-    ### 📝 Requirements:
-    1. Original TMJ PDF file (not scanned)
-    2. PDF should contain standard TMJ format
-    3. File size should be reasonable (<50MB recommended)
-    
-    ### 🔍 What this tool extracts:
-    - Advertisement numbers
-    - Corrigenda numbers  
-    - RC numbers
-    - Renewal numbers
-    
-    *Colors represent the Indian national flag theme*
-""")
