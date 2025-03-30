@@ -5,135 +5,196 @@ import pandas as pd
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
+import io
 
-# Logging setup
-logging.basicConfig(filename="pdf_extraction.log", level=logging.DEBUG, format="%(asctime)s - %(message)s")
+# Configure logging
+logging.basicConfig(
+    filename="pdf_extraction.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    filemode='w'
+)
 
-# Precompile regex patterns
-advertisement_pattern = re.compile(r' (\d{5,})\s+\d{2}/\d{2}/\d{4}')
-corrigenda_pattern = re.compile(r' (\d{5,})\s*[--]')
-rc_pattern = re.compile(r'\b(\d{7})\b')
-renewal_pattern_7_digits = re.compile(r'\b(\d{7})\b')
-renewal_pattern_application_no = re.compile(r'Application No\s*(\d{5,})')
+# Precompile all regex patterns
+PATTERNS = {
+    'advertisement': re.compile(r' (\d{5,})\s+\d{2}/\d{2}/\d{4}'),
+    'corrigenda': re.compile(r' (\d{5,})\s*[--]'),
+    'rc': re.compile(r'\b(\d{7})\b'),
+    'renewal': {
+        '7digits': re.compile(r'\b(\d{7})\b'),
+        'app_no': re.compile(r'Application No\s*(\d{5,})')
+    }
+}
 
-def extract_numbers(text, pattern):
-    """Extracts numbers from text using a given regex pattern."""
-    return pattern.findall(text)
-
-def extract_advertisement_numbers(text):
-    """Extracts advertisement numbers from the text."""
-    numbers = []
-    for line in text.splitlines():
-        if "CORRIGENDA" in line:
-            break
-        numbers.extend(extract_numbers(line, advertisement_pattern))
-    return numbers
-
-def extract_corrigenda_numbers(text):
-    """Extracts corrigenda numbers from the text."""
-    numbers = []
-    found = False
-    for line in text.splitlines():
-        if "CORRIGENDA" in line:
-            found = True
-            continue
-        if "Following Trade Mark applications have been Registered" in line:
-            break
-        if found:
-            numbers.extend(extract_numbers(line, corrigenda_pattern))
-    return numbers
-
-def extract_rc_numbers(text):
-    """Extracts RC numbers from the text."""
-    numbers = []
-    for line in text.splitlines():
-        if "Following Trade Marks Registration Renewed" in line:
-            break
-        columns = line.split()
-        if len(columns) == 5 and all(col.isdigit() for col in columns):
-            numbers.extend(columns)
-    return numbers
-
-def extract_renewal_numbers(text):
-    """Extracts renewal numbers from the text."""
-    numbers = []
-    found = False
-    for line in text.splitlines():
-        if "Following Trade Marks Registration Renewed" in line:
-            found = True
-            continue
-        if found:
-            numbers.extend(extract_numbers(line, renewal_pattern_7_digits))
-            numbers.extend(extract_numbers(line, renewal_pattern_application_no))
-    return numbers
+def fast_extract(text, pattern):
+    """Optimized number extraction using precompiled patterns."""
+    return pattern.findall(text) if text else []
 
 def process_page(page):
-    """Processes a single page of the PDF to extract relevant numbers."""
-    text = page.extract_text()
-    if not text:
-        return None
-    return {
-        "Advertisement": extract_advertisement_numbers(text),
-        "Corrigenda": extract_corrigenda_numbers(text),
-        "RC": extract_rc_numbers(text),
-        "Renewal": extract_renewal_numbers(text),
-    }
-
-def extract_from_pdf(pdf_file, progress_bar, status_text):
-    """Extracts numbers from a PDF file using multithreading."""
-    data = {"Advertisement": [], "Corrigenda": [], "RC": [], "Renewal": []}
-    start_time = time.time()
+    """Optimized page processing with bulk text extraction."""
     try:
-        with pdfplumber.open(pdf_file) as pdf:
-            pages = pdf.pages
-            total_pages = len(pages)
-            with ThreadPoolExecutor(max_workers=8) as executor:
-                futures = [executor.submit(process_page, page) for page in pages]
-                for i, future in enumerate(as_completed(futures)):
-                    result = future.result()
-                    if result:
-                        for key, values in result.items():
-                            data[key].extend(values)
-                    elapsed_time = time.time() - start_time
-                    remaining_pages = total_pages - (i + 1)
-                    estimated_time_remaining = (elapsed_time / (i + 1)) * remaining_pages if (i+1) else 0
-                    status_text.markdown(f"<h4 style='text-align: center; color: #FFA500;'>Processed {i + 1}/{total_pages} pages...<br>Time Remaining: {estimated_time_remaining:.2f} seconds</h4>", unsafe_allow_html=True)
-                    progress_bar.progress((i + 1) / total_pages)
-            progress_bar.progress(1.0)
-            return data
+        text = page.extract_text()
+        if not text:
+            return None
+        
+        # Fast parallel extraction
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = {
+                'Advertisement': executor.submit(
+                    lambda t: list(set(fast_extract(t.split('CORRIGENDA')[0], PATTERNS['advertisement']))),
+                    text
+                ),
+                'Corrigenda': executor.submit(
+                    lambda t: list(set(fast_extract(
+                        t.split('Following Trade Mark applications have been Registered')[0].split('CORRIGENDA')[-1],
+                        PATTERNS['corrigenda']
+                    ))),
+                    text
+                ),
+                'RC': executor.submit(
+                    lambda t: list(set(
+                        [col for line in t.splitlines() 
+                         for col in line.split()[:5] 
+                         if len(line.split()) == 5 and all(c.isdigit() for c in line.split()[:5])
+                    )),
+                    text
+                ),
+                'Renewal': executor.submit(
+                    lambda t: list(set(
+                        fast_extract(t.split('Following Trade Marks Registration Renewed')[-1], PATTERNS['renewal']['7digits']) +
+                        fast_extract(t.split('Following Trade Marks Registration Renewed')[-1], PATTERNS['renewal']['app_no'])
+                    )),
+                    text
+                )
+            }
+            
+            return {k: f.result() for k, f in futures.items()}
+            
     except Exception as e:
-        st.error(f"Error processing PDF: {e}")
-        logging.error(f"PDF processing error: {e}")
+        logging.error(f"Page {page.page_number} error: {str(e)}")
+        return None
+
+def fast_pdf_processing(uploaded_file, progress_bar, status_text):
+    """Optimized PDF processing pipeline."""
+    data = {k: [] for k in PATTERNS.keys()}
+    data['Renewal'] = []  # Special case
+    
+    try:
+        # Read entire file into memory for faster access
+        pdf_bytes = io.BytesIO(uploaded_file.read())
+        
+        with pdfplumber.open(pdf_bytes) as pdf:
+            total_pages = len(pdf.pages)
+            start_time = time.time()
+            
+            # Process pages in batches
+            batch_size = min(50, max(10, total_pages // 10))
+            for batch_start in range(0, total_pages, batch_size):
+                batch = pdf.pages[batch_start:batch_start + batch_size]
+                
+                with ThreadPoolExecutor(max_workers=8) as executor:
+                    futures = [executor.submit(process_page, page) for page in batch]
+                    
+                    for i, future in enumerate(as_completed(futures), start=batch_start):
+                        result = future.result()
+                        if result:
+                            for k, v in result.items():
+                                data[k].extend(v)
+                        
+                        # Update progress less frequently for better performance
+                        if i % 5 == 0 or i == total_pages - 1:
+                            elapsed = time.time() - start_time
+                            remaining = total_pages - i - 1
+                            eta = (elapsed / (i + 1)) * remaining if i else 0
+                            
+                            status_text.markdown(
+                                f"<h4 style='text-align: center; color: #FFA500;'>"
+                                f"Processed {i + 1}/{total_pages} pages...<br>"
+                                f"Speed: {(i + 1)/elapsed:.1f} pages/sec<br>"
+                                f"ETA: {eta:.1f} seconds</h4>",
+                                unsafe_allow_html=True
+                            )
+                            progress_bar.progress((i + 1) / total_pages)
+            
+            # Deduplicate results
+            return {k: list(set(v)) for k, v in data.items()}
+            
+    except Exception as e:
+        logging.error(f"PDF processing failed: {str(e)}", exc_info=True)
+        st.error(f"Processing error: {str(e)}")
         return None
 
 def main():
-    """Main function to run the Streamlit application."""
-    st.set_page_config(page_title="PDF Extractor", page_icon="📄", layout="wide")
-    st.markdown("<h1 style='text-align: center; color: #FF4B4B;'>INDIA TMJ</h1>", unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align: center; color: #4CAF50;'>Extract Numbers from PDF</h2>", unsafe_allow_html=True)
-
-    uploaded_file = st.file_uploader("Upload PDF", type=["pdf"])
-
+    """Streamlit UI with optimized rendering."""
+    st.set_page_config(
+        page_title="Fast PDF Extractor",
+        page_icon="⚡",
+        layout="wide"
+    )
+    
+    st.markdown("""
+        <style>
+            .stProgress > div > div > div > div {
+                background-color: #4CAF50;
+            }
+            .reportview-container .main .block-container {
+                padding-top: 2rem;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    st.title("⚡ INDIA TMJ Fast Extractor")
+    st.subheader("Extract Numbers from PDF with High Speed")
+    
+    uploaded_file = st.file_uploader(
+        "Upload PDF File", 
+        type=["pdf"],
+        help="For best performance, use PDFs < 100 pages"
+    )
+    
     if uploaded_file:
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        with st.spinner("Processing PDF..."):
-            extracted_data = extract_from_pdf(uploaded_file, progress_bar, status_text)
-
-        if extracted_data and any(extracted_data.values()):
-            st.success("Extraction complete!")
-            st.markdown("<h3 style='text-align: center; color: #4CAF50;'>Extracted Data</h3>", unsafe_allow_html=True)
-
-            tabs = st.tabs(["Advertisement", "Corrigenda", "RC", "Renewal"])
-            for tab, (section, numbers) in zip(tabs, extracted_data.items()):
-                with tab:
-                    if numbers:
-                        st.dataframe(pd.DataFrame(sorted(set(numbers)), columns=["Numbers"]))
-                    else:
-                        st.write(f"No {section} numbers found.")
-        else:
-            st.warning("No matching numbers found in the PDF.")
+        with st.spinner("Optimizing PDF processing..."):
+            # Pre-warm the system
+            time.sleep(0.1)
+            
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            start_time = time.time()
+            results = fast_pdf_processing(uploaded_file, progress_bar, status_text)
+            processing_time = time.time() - start_time
+            
+        if results:
+            st.success(f"Processed in {processing_time:.2f} seconds!")
+            
+            # Fast rendering with tabs
+            tab1, tab2, tab3, tab4 = st.tabs([
+                "📢 Advertisement", 
+                "✏️ Corrigenda", 
+                "®️ RC", 
+                "🔄 Renewal"
+            ])
+            
+            with tab1:
+                st.dataframe(pd.DataFrame(results['Advertisement'], columns=["Numbers"]))
+            with tab2:
+                st.dataframe(pd.DataFrame(results['Corrigenda'], columns=["Numbers"]))
+            with tab3:
+                st.dataframe(pd.DataFrame(results['RC'], columns=["Numbers"]))
+            with tab4:
+                st.dataframe(pd.DataFrame(results['Renewal'], columns=["Numbers"]))
+            
+            # Download all button
+            csv = pd.concat([
+                pd.DataFrame({k: v}) for k, v in results.items()
+            ], axis=1).to_csv(index=False).encode('utf-8')
+            
+            st.download_button(
+                label="📥 Download All Results as CSV",
+                data=csv,
+                file_name="tmj_extraction_results.csv",
+                mime="text/csv"
+            )
 
 if __name__ == "__main__":
     main()
-
