@@ -75,7 +75,7 @@ def process_page(page):
         logging.error(f"Page {page.page_number} error: {str(e)}")
         return None
 
-def fast_pdf_processing(uploaded_file, progress_bar, status_text):
+def fast_pdf_processing(uploaded_file, progress_container, status_text):
     """Optimized PDF processing pipeline."""
     data = {k: [] for k in ['Advertisement', 'Corrigenda', 'RC', 'Renewal']}
     
@@ -86,6 +86,10 @@ def fast_pdf_processing(uploaded_file, progress_bar, status_text):
         with pdfplumber.open(pdf_bytes) as pdf:
             total_pages = len(pdf.pages)
             start_time = time.time()
+            
+            # Initialize progress bar
+            progress_bar = progress_container.progress(0)
+            progress_text = progress_container.empty()
             
             # Process pages in batches
             batch_size = min(50, max(10, total_pages // 10))
@@ -101,20 +105,26 @@ def fast_pdf_processing(uploaded_file, progress_bar, status_text):
                             for k, v in result.items():
                                 data[k].extend(v)
                         
-                        # Update progress less frequently for better performance
-                        if i % 5 == 0 or i == total_pages - 1:
-                            elapsed = time.time() - start_time
-                            remaining = total_pages - i - 1
-                            eta = (elapsed / (i + 1)) * remaining if i else 0
-                            
-                            status_text.markdown(
-                                f"<h4 style='text-align: center; color: #FFA500;'>"
-                                f"Processed {i + 1}/{total_pages} pages...<br>"
-                                f"Speed: {(i + 1)/elapsed:.1f} pages/sec<br>"
-                                f"ETA: {eta:.1f} seconds</h4>",
-                                unsafe_allow_html=True
-                            )
-                            progress_bar.progress((i + 1) / total_pages)
+                        # Update progress
+                        progress = (i + 1) / total_pages
+                        progress_bar.progress(progress)
+                        
+                        elapsed = time.time() - start_time
+                        remaining = total_pages - i - 1
+                        eta = (elapsed / (i + 1)) * remaining if i else 0
+                        
+                        progress_text.markdown(
+                            f"**Progress:** {progress:.1%} "
+                            f"({i + 1}/{total_pages} pages) | "
+                            f"**Speed:** {(i + 1)/elapsed:.1f} pages/sec | "
+                            f"**ETA:** {eta:.1f} seconds"
+                        )
+                        
+                        status_text.markdown(
+                            f"<h4 style='text-align: center; color: #FFA500;'>"
+                            f"Processing page {i + 1} of {total_pages}</h4>",
+                            unsafe_allow_html=True
+                        )
             
             # Deduplicate results
             return {k: sorted(list(set(v))) for k, v in data.items()}
@@ -153,19 +163,18 @@ def main():
     )
     
     if uploaded_file:
-        with st.spinner("Optimizing PDF processing..."):
-            # Pre-warm the system
-            time.sleep(0.1)
-            
-            progress_bar = st.progress(0)
+        with st.spinner("Initializing PDF processing..."):
+            # Create containers for progress display
+            progress_container = st.container()
             status_text = st.empty()
             
             start_time = time.time()
-            results = fast_pdf_processing(uploaded_file, progress_bar, status_text)
+            results = fast_pdf_processing(uploaded_file, progress_container, status_text)
             processing_time = time.time() - start_time
             
         if results:
-            st.success(f"Processed in {processing_time:.2f} seconds!")
+            st.success(f"✅ Processing completed in {processing_time:.2f} seconds!")
+            st.balloons()
             
             # Fast rendering with tabs
             tab1, tab2, tab3, tab4 = st.tabs([
@@ -176,13 +185,25 @@ def main():
             ])
             
             with tab1:
-                st.dataframe(pd.DataFrame(results['Advertisement'], columns=["Numbers"]))
+                if results['Advertisement']:
+                    st.dataframe(pd.DataFrame(results['Advertisement'], columns=["Numbers"]))
+                else:
+                    st.info("No advertisement numbers found")
             with tab2:
-                st.dataframe(pd.DataFrame(results['Corrigenda'], columns=["Numbers"]))
+                if results['Corrigenda']:
+                    st.dataframe(pd.DataFrame(results['Corrigenda'], columns=["Numbers"]))
+                else:
+                    st.info("No corrigenda numbers found")
             with tab3:
-                st.dataframe(pd.DataFrame(results['RC'], columns=["Numbers"]))
+                if results['RC']:
+                    st.dataframe(pd.DataFrame(results['RC'], columns=["Numbers"]))
+                else:
+                    st.info("No RC numbers found")
             with tab4:
-                st.dataframe(pd.DataFrame(results['Renewal'], columns=["Numbers"]))
+                if results['Renewal']:
+                    st.dataframe(pd.DataFrame(results['Renewal'], columns=["Numbers"]))
+                else:
+                    st.info("No renewal numbers found")
             
             # Download all button
             csv = pd.concat([
@@ -193,7 +214,8 @@ def main():
                 label="📥 Download All Results as CSV",
                 data=csv,
                 file_name="tmj_extraction_results.csv",
-                mime="text/csv"
+                mime="text/csv",
+                help="Download all extracted numbers in a single CSV file"
             )
 
 if __name__ == "__main__":
