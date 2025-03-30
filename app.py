@@ -91,11 +91,6 @@ def extract_rc_numbers(text):
 
     return list(set(rc_numbers))  # Remove duplicates
 
-# Function to extract numbers based on a pattern
-def extract_numbers(line, pattern):
-    """Helper function to extract numbers from a line based on a given pattern"""
-    return re.findall(pattern, line)
-
 # Function to extract renewal numbers
 def extract_renewal_numbers(text):
     """Extract renewal numbers after 'Following Trade Marks Registration Renewed' section"""
@@ -163,9 +158,6 @@ def process_pdf(uploaded_file, progress_bar, status_text):
                         progress_bar.progress(progress)
                         status_text.markdown(
                             f"**Progress:** {progress:.1%} | "
-                            f"**Pages:** {i}/{total_pages} | "
-                            f"**Speed:** {speed:.1f} pages/sec | "
-                            f"**ETA:** {eta:.1f} sec"
                         )
             
             # Final processing and validation
@@ -208,8 +200,7 @@ def generate_excel(data):
 
 # Streamlit UI Configuration
 st.set_page_config(
-    page_title="TMJ Excel Extractor",
-    page_icon="📊",
+    page_title="INDIA TMJ",
     layout="centered",
     initial_sidebar_state="expanded"
 )
@@ -231,10 +222,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Main App Interface
-st.title("📊 India TMJ to Excel Converter")
-st.markdown("""
-    Extract **Advertisement**, **Corrigenda**, **RC**, and **Renewal** numbers  
-    from Trade Marks Journal PDFs and download as Excel file.
+st.title("TRADEMARK")
+st.markdown("""Application No in Excel
 """)
 
 uploaded_file = st.file_uploader(
@@ -292,7 +281,3 @@ if uploaded_file:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 help="Click to download all extracted numbers in Excel format"
             )
-
-# Footer
-st.markdown("---")
-st.caption("Trade Marks Journal Data Extractor | v1.0")
