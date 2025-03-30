@@ -106,7 +106,7 @@ def extract_numbers_from_pdf(pdf_file, progress_bar):
                                 extracted_data[key].extend(result[key])
                         processed_pages += 1
                         progress_bar.progress(processed_pages / total_pages)
-                        status_text.markdown(f"**Processed {processed_pages}/{total_pages} pages...**", unsafe_allow_html=True)
+                        status_text.markdown(f"<h4 style='text-align: center;'>Processed {processed_pages}/{total_pages} pages...</h4>", unsafe_allow_html=True)
                     except Exception as e:
                         logging.error(f"Error processing page {futures[future]}: {str(e)}")
         progress_bar.empty()
@@ -118,15 +118,15 @@ def extract_numbers_from_pdf(pdf_file, progress_bar):
 
 def main():
     st.set_page_config(page_title="PDF Extractor", page_icon="📄", layout="wide")
-    st.markdown("<h2 style='color: #FF4B4B;'>INDIA TMJ - Extract Numbers from PDFs</h2>", unsafe_allow_html=True)
-    st.sidebar.header("Settings")
+    st.markdown("<h1 style='text-align: center; color: #FF4B4B;'>INDIA TMJ</h1>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #4CAF50;'>Extract Numbers from PDFs</h2>", unsafe_allow_html=True)
     uploaded_file = st.file_uploader("📄 Upload a PDF", type=["pdf"])
     if uploaded_file:
         progress_bar = st.progress(0)
         extracted_data = extract_numbers_from_pdf(uploaded_file, progress_bar)
         if extracted_data and any(extracted_data.values()):
             st.success("✅ Extraction Completed!")
-            st.markdown("<h3 style='color: #4CAF50;'>Preview Extracted Data</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='text-align: center; color: #4CAF50;'>Preview Extracted Data</h3>", unsafe_allow_html=True)
             selected_section = st.selectbox("Select a Section", list(extracted_data.keys()))
             st.dataframe(pd.DataFrame(sorted(set(extracted_data[selected_section])), columns=["Numbers"]))
         else:
