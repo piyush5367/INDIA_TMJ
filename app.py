@@ -190,88 +190,158 @@ def generate_excel(data):
     
     return output.getvalue()
 
-# Streamlit UI Configuration
+# Streamlit UI Configuration with Saffron and Green Theme
 st.set_page_config(
     page_title="INDIA TMJ",
     layout="centered",
     initial_sidebar_state="expanded",
-    page_icon="📄"
+    page_icon="🇮🇳"
 )
 
-# Modern CSS styling
+# Saffron and Green CSS styling
 st.markdown("""
     <style>
+        :root {
+            --saffron: #FF9933;
+            --saffron-light: #FFB366;
+            --saffron-dark: #E68A2E;
+            --green: #138808;
+            --green-light: #16A309;
+            --green-dark: #0D6600;
+            --white: #FFFFFF;
+            --text: #333333;
+            --bg: #F5F5F5;
+        }
+        
+        body {
+            background-color: var(--bg);
+        }
+        
         .main-title {
             text-align: center;
             font-size: 2.5rem;
-            font-weight: 700;
-            color: #1f77b4;
+            font-weight: 800;
             margin-bottom: 0.5rem;
             padding-top: 1rem;
+            color: var(--saffron-dark);
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
         }
+        
         .sub-title {
             text-align: center;
-            font-size: 1.1rem;
-            color: #4a4a4a;
+            font-size: 1.2rem;
+            color: var(--text);
             margin-bottom: 2rem;
-            font-weight: 400;
+            font-weight: 500;
         }
+        
         .stProgress > div > div > div > div {
-            background-color: #1f77b4;
+            background: linear-gradient(90deg, var(--saffron), var(--saffron-dark));
         }
+        
         .stDownloadButton button {
             width: 100%;
             justify-content: center;
-            background-color: #1f77b4;
-            color: white;
+            background: linear-gradient(90deg, var(--green), var(--green-dark));
+            color: var(--white);
             border: none;
             transition: all 0.3s;
+            font-weight: 600;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+        
         .stDownloadButton button:hover {
-            background-color: #1668a8;
-            transform: scale(1.02);
+            background: linear-gradient(90deg, var(--green-light), var(--green));
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
-        .st-emotion-cache-1v0mbdj img {
-            margin: auto;
+        
+        .stTab button {
+            color: var(--text);
+            font-weight: 600;
         }
+        
+        .stTab button[aria-selected="true"] {
+            color: var(--saffron-dark);
+            border-bottom: 3px solid var(--saffron);
+        }
+        
+        .stAlert {
+            border-left: 4px solid var(--saffron);
+        }
+        
+        .stDataFrame {
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border-radius: 8px;
+        }
+        
+        .stFileUploader > div > div {
+            border: 2px dashed var(--saffron);
+            border-radius: 8px;
+            background-color: rgba(255, 153, 51, 0.05);
+        }
+        
+        .stSpinner > div > div {
+            border: 3px solid rgba(255, 153, 51, 0.2);
+            border-top: 3px solid var(--saffron);
+        }
+        
+        .stSuccess {
+            background-color: rgba(19, 136, 8, 0.1) !important;
+            border-left: 4px solid var(--green) !important;
+        }
+        
+        .stWarning {
+            background-color: rgba(255, 153, 51, 0.1) !important;
+            border-left: 4px solid var(--saffron) !important;
+        }
+        
+        .stError {
+            background-color: rgba(255, 51, 51, 0.1) !important;
+            border-left: 4px solid #FF3333 !important;
+        }
+        
+        .stInfo {
+            background-color: rgba(255, 153, 51, 0.1) !important;
+            border-left: 4px solid var(--saffron) !important;
+        }
+        
         .stMarkdown {
             margin-bottom: 1.5rem;
         }
-        .stTab {
-            border-radius: 8px;
-            overflow: hidden;
+        
+        .stButton button {
+            background-color: var(--saffron);
+            color: white;
         }
-        .stTab > div > div > div > div {
-            border-radius: 8px 8px 0 0;
-        }
-        .stDataFrame {
-            border-radius: 0 0 8px 8px;
-        }
-        .stAlert {
-            border-radius: 8px;
+        
+        .stButton button:hover {
+            background-color: var(--saffron-dark);
+            color: white;
         }
     </style>
 """, unsafe_allow_html=True)
 
-# Main App Interface
-st.markdown('<h1 class="main-title">TRADEMARK JOURNAL EXTRACTOR</h1>', unsafe_allow_html=True)
-st.markdown('<p class="sub-title">Extract Application Numbers to Excel Automatically</p>', unsafe_allow_html=True)
+# Main App Interface with Indian Theme
+st.markdown('<h1 class="main-title">🇮🇳 TRADEMARK JOURNAL EXTRACTOR</h1>', unsafe_allow_html=True)
+st.markdown('<p class="sub-title">Extract Application Numbers to Excel with National Colors</p>', unsafe_allow_html=True)
 
+# File uploader section with saffron border
 uploaded_file = st.file_uploader(
-    "Upload TMJ PDF file",
+    "📄 Upload TMJ PDF File",
     type=["pdf"],
     help="For best results, use original PDF files (not scanned documents)"
 )
 
 if uploaded_file:
     file_size = len(uploaded_file.getvalue()) / (1024 * 1024)
-    st.info(f"**File:** {uploaded_file.name} | **Size:** {file_size:.2f} MB")
+    st.info(f"**📁 File:** {uploaded_file.name} | **📏 Size:** {file_size:.2f} MB | **🔍 Ready to process**")
     
     progress_bar = st.progress(0)
     status_text = st.empty()
     results_area = st.empty()
     
-    with st.spinner("Analyzing document..."):
+    with st.spinner("⏳ Processing document with saffron power..."):
         start_time = time.time()
         results = process_pdf(uploaded_file, progress_bar, status_text)
         processing_time = time.time() - start_time
@@ -281,28 +351,28 @@ if uploaded_file:
         status_text.empty()
         
         with results_area.container():
-            st.success(f"✅ Extraction completed in {processing_time:.2f} seconds!")
+            st.success(f"✅ **Success!** Extraction completed in {processing_time:.2f} seconds!")
             st.balloons()
             
-            tabs = st.tabs(list(results.keys()))
+            tabs = st.tabs([f"📋 {cat}" for cat in results.keys()])
             for tab, (category, numbers) in zip(tabs, results.items()):
                 with tab:
                     if numbers:
                         st.dataframe(
-                            pd.DataFrame(numbers, columns=[category]),
+                            pd.DataFrame(numbers, columns=[f"🔢 {category} Numbers"]),
                             height=300,
                             use_container_width=True
                         )
-                        st.caption(f"Found {len(numbers)} {category} numbers")
+                        st.caption(f"🎯 Found {len(numbers)} {category.lower()} numbers")
                     else:
-                        st.warning(f"No {category} numbers found")
+                        st.warning(f"⚠️ No {category.lower()} numbers found in this document")
             
             st.markdown("---")
-            st.subheader("Download Results")
+            st.subheader("💾 Download Results")
             
             excel_file = generate_excel(results)
             st.download_button(
-                label="⬇️ Download Excel Report",
+                label="⬇️ Download Excel Report (Green for Go!)",
                 data=excel_file,
                 file_name="tmj_results.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
