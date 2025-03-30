@@ -168,7 +168,6 @@ st.set_page_config(
     page_title="INDIA TMJ Extractor",
     layout="centered",
     initial_sidebar_state="expanded",
-    page_icon="🇮🇳"
 )
 
 # Custom CSS with Saffron and Green theme
