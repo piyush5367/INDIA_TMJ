@@ -6,18 +6,22 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO
 
-# Precompile all regex patterns for performance
+# ===== CSS Injection =====
+def load_css():
+    with open("styles.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+# ===== Core Processing Functions (Unchanged) =====
 PATTERNS = {
     'Advertisement': re.compile(r' (\d{5,})\s+\d{2}/\d{2}/\d{4}'),
     'Corrigenda': re.compile(r' (\d{5,})\s*[-—–]'),
     'RC': re.compile(r'^(\d+\s+){4}\d+$', re.MULTILINE),
-    'Renewal': re.compile(r'(Application No\s*(\d{5,})|(?<!\d)(\d{5,})(?!\d))')  # Updated pattern
+    'Renewal': re.compile(r'(Application No\s*(\d{5,})|(?<!\d)(\d{5,})(?!\d))')
 }
 
 def extract_section(text, start_marker, end_marker=None):
     start = text.find(start_marker)
-    if start == -1:
-        return ""
+    if start == -1: return ""
     if end_marker:
         end = text.find(end_marker, start)
         return text[start:end] if end != -1 else text[start:]
@@ -36,8 +40,7 @@ def extract_advertisement_numbers(text):
     lines = text.split("\n")
     for line in lines:
         line = line.strip()
-        if "CORRIGENDA" in line:
-            break
+        if "CORRIGENDA" in line: break
         matches = re.findall(r'(\d{5,})\s+\d{2}/\d{2}/\d{4}', line)
         advertisement_numbers.extend(matches)
     return advertisement_numbers
@@ -51,8 +54,7 @@ def extract_corrigenda_numbers(text):
         if "CORRIGENDA" in line:
             found_corrigenda_section = True
             continue
-        if "Following Trade Mark applications have been Registered and registration certificates are available on the official website" in line:
-            break
+        if "Following Trade Mark applications have been Registered" in line: break
         if found_corrigenda_section:
             matches = re.findall(r'(\d{5,})\s*[-–—]', line)
             corrigenda_numbers.extend(matches)
@@ -63,8 +65,7 @@ def extract_rc_numbers(text):
     lines = text.split("\n")
     for line in lines:
         line = line.strip()
-        if "Following Trade Marks Registration Renewed for a Period Of Ten Years" in line:
-            break
+        if "Following Trade Marks Registration Renewed" in line: break
         columns = line.split()
         if len(columns) == 5 and all(col.isdigit() for col in columns):
             rc_numbers.extend(columns)
@@ -76,7 +77,7 @@ def extract_renewal_numbers(text):
     lines = text.split("\n")
     for line in lines:
         line = line.strip()
-        if "Following Trade Marks Registration Renewed for a Period Of Ten Years" in line:
+        if "Following Trade Marks Registration Renewed" in line:
             found_renewal_section = True
             continue
         if found_renewal_section:
@@ -114,15 +115,15 @@ def process_pdf(uploaded_file, progress_bar, status_text):
                         progress = i / total_pages
                         progress_bar.progress(progress)
                         status_text.markdown(f"**Progress:** {progress:.1%} ({i}/{total_pages} pages)")
+            
+            # Clean and sort results
             final_results = {}
             for category, numbers in results.items():
                 try:
                     cleaned = [str(n).strip() for n in numbers if str(n).strip()]
                     numeric_strings = [n for n in cleaned if n.isdigit()]
                     non_numeric_strings = [n for n in cleaned if not n.isdigit()]
-                    sorted_numeric = sorted(numeric_strings, key=int)
-                    sorted_non_numeric = sorted(non_numeric_strings)
-                    final_results[category] = sorted_numeric + sorted_non_numeric
+                    final_results[category] = sorted(numeric_strings, key=int) + sorted(non_numeric_strings)
                 except Exception as e:
                     st.error(f"Error processing {category}: {str(e)}")
                     final_results[category] = []
@@ -143,137 +144,65 @@ def generate_excel(data):
 
 def display_results(data):
     if not data:
-        st.warning("No data was extracted from the PDF.")
+        st.error("No data was extracted from the PDF.")
         return
     
     st.success("✅ Extraction completed successfully!")
     
-    # Create tabs for each category
     tabs = st.tabs(list(data.keys()))
-    
     for tab, (category, numbers) in zip(tabs, data.items()):
         with tab:
             if numbers:
                 st.subheader(f"{category} Numbers ({len(numbers)} found)")
-                # Display first 100 numbers with option to show more
-                display_count = min(100, len(numbers))
-                st.write(f"Showing {display_count} of {len(numbers)} numbers:")
-                st.write(numbers[:display_count])
-                
-                if len(numbers) > display_count:
-                    if st.checkbox(f"Show all {len(numbers)} {category} numbers"):
-                        st.write(numbers)
+                st.dataframe(numbers, height=300)
             else:
-                st.info(f"No {category} numbers found in this document.")
+                st.info(f"No {category} numbers found")
 
+# ===== Main App =====
 def main():
+    load_css()
     st.set_page_config(
         page_title="INDIA TMJ Extractor",
         layout="centered",
         initial_sidebar_state="expanded",
     )
 
-    st.markdown("""
-        <style>
-            :root {
-                --saffron: #FF9933;
-                --saffron-light: #FFB366;
-                --saffron-dark: #E68A2E;
-                --green: #138808;
-                --green-light: #16A309;
-                --green-dark: #0D6600;
-                --white: #FFFFFF;
-                --text: #333333;
-                --bg: #F5F5F5;
-            }
-            .main-title {
-                text-align: center;
-                font-size: 2.5rem;
-                font-weight: 700;
-                color: var(--saffron-dark);
-                margin-bottom: 0.5rem;
-                padding-top: 1rem;
-            }
-            .sub-title {
-                text-align: center;
-                font-size: 1.1rem;
-                color: var(--text);
-                margin-bottom: 2rem;
-            }
-            .stProgress > div > div > div > div {
-                background-color: var(--saffron) !important;
-            }
-            .stDownloadButton button {
-                background-color: var(--green) !important;
-                color: white !important;
-                border: none !important;
-                transition: all 0.3s !important;
-            }
-            .stDownloadButton button:hover {
-                background-color: var(--green-dark) !important;
-                transform: translateY(-2px);
-            }
-            .stTab button[aria-selected="true"] {
-                color: var(--saffron-dark) !important;
-                border-bottom: 3px solid var(--saffron) !important;
-            }
-            div.stFileUploader > div > div {
-                border: 2px dashed var(--saffron) !important;
-                border-radius: 8px;
-            }
-            .stAlert {
-                border-left: 4px solid var(--saffron) !important;
-            }
-            .stSuccess {
-                border-left: 4px solid var(--green) !important;
-            }
-            .stSpinner > div > div {
-                border-color: var(--saffron) !important;
-            }
-        </style>
-    """, unsafe_allow_html=True)
+    with st.container():
+        st.markdown('<h1 class="main-title">TRADEMARK JOURNAL EXTRACTOR</h1>', unsafe_allow_html=True)
+        st.markdown('<p class="sub-title">Extract Application Numbers from TMJ PDFs in Excel</p>', unsafe_allow_html=True)
 
-    st.markdown('<h1 class="main-title">TRADEMARK JOURNAL EXTRACTOR</h1>', unsafe_allow_html=True)
-    st.markdown("""
-        <p class="sub-title">
-            Extract Application Numbers from TMJ PDFs in Excel
-        </p>
-    """, unsafe_allow_html=True)
-
-    uploaded_file = st.file_uploader(
-        "📄 Upload TMJ PDF File",
-        type=["pdf"],
-        help="Upload the Trademark Journal PDF file to extract application numbers"
-    )
+    with st.container():
+        uploaded_file = st.file_uploader(
+            "📄 Upload TMJ PDF File",
+            type=["pdf"],
+            help="Upload the Trademark Journal PDF file to extract application numbers"
+        )
 
     if uploaded_file:
         progress_bar = st.progress(0)
         status_text = st.empty()
+        
         with st.spinner("🔍 Processing PDF..."):
-            start_time = time.time()
             results = process_pdf(uploaded_file, progress_bar, status_text)
-            processing_time = time.time() - start_time
         
         progress_bar.empty()
         status_text.empty()
         
         if results:
-            # Display the results
-            display_results(results)
-            
-            # Generate and download Excel file
-            excel_data = generate_excel(results)
-            st.download_button(
-                label="📥 Download Excel File",
-                data=excel_data,
-                file_name="tmj_extracted_numbers.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                help="Download all extracted numbers in Excel format"
-            )
-            
-            st.info(f"⏱️ Processing time: {processing_time:.2f} seconds")
+            with st.container():
+                st.markdown('<div class="custom-card">', unsafe_allow_html=True)
+                display_results(results)
+                
+                excel_data = generate_excel(results)
+                st.download_button(
+                    label="📥 Download Excel File",
+                    data=excel_data,
+                    file_name="tmj_extracted_numbers.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+                st.markdown('</div>', unsafe_allow_html=True)
         else:
-            st.error("No data could be extracted from the PDF. Please check the file format.")
+            st.error("No data could be extracted. Please check the file format.")
 
 if __name__ == "__main__":
     main()
