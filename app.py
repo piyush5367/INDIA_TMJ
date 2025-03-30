@@ -14,65 +14,83 @@ logging.basicConfig(
     format="%(asctime)s - %(message)s"
 )
 
-# Precompile regex patterns
-advertisement_pattern = re.compile(r'(\d{5,})\s+\d{2}/\d{2}/\d{4}')
-corrigenda_pattern = re.compile(r'(\d{5,})\s*[ ]')
-rc_pattern = re.compile(r'\b(\d{7})\b')
-renewal_pattern_7_digits = re.compile(r'\b(\d{7})\b')
-renewal_pattern_application_no = re.compile(r'Application No\s*\((\d+)\)\s*Class')
+# Helper function to extract numbers based on regex
+def extract_numbers(text, pattern):
+    return re.findall(pattern, text)
 
-# Extraction functions
+# Function to extract Advertisement numbers
 def extract_advertisement_numbers(text):
     advertisement_numbers = []
-    lines = text.split("\n")
+    lines = text.split("\n")  # Split text into lines
+
     for line in lines:
-        line = line.strip()
+        line = line.strip()  # Remove extra spaces
+        
         if "CORRIGENDA" in line:  # Stop when Corrigenda section starts
             break
-        matches = re.findall(r'(\d{5,})\s+\d{2}/\d{2}/\d{4}', line)
+        
+        matches = extract_numbers(line, r'(\d{5,})\s+\d{2}/\d{2}/\d{4}')  # Extracting numbers
         advertisement_numbers.extend(matches)
+    
     return advertisement_numbers
 
+# Function to extract Corrigenda numbers
 def extract_corrigenda_numbers(text):
     corrigenda_numbers = []
     found_corrigenda_section = False
-    lines = text.split("\n")
+    lines = text.split("\n")  # Split text into lines
+
     for line in lines:
-        line = line.strip()
-        if "CORRIGENDA" in line:
+        line = line.strip()  # Remove extra spaces
+
+        if "CORRIGENDA" in line:  # Start extraction from Corrigenda section
             found_corrigenda_section = True
             continue
-        if "Following Trade Mark applications have been Registered" in line:
-            break
+
+        if "Following Trade Mark applications have been Registered and registration certificates are available on the official website" in line:
+            break  # Stop extraction when RC section starts
+
         if found_corrigenda_section:
-            matches = re.findall(r'(\d{5,})\s*[--]', line)
+            matches = extract_numbers(line, r'(\d{5,})\s*[-–]')  # Extract numbers followed by "-"
             corrigenda_numbers.extend(matches)
+
     return corrigenda_numbers
 
+# Function to extract RC numbers
 def extract_rc_numbers(text):
     rc_numbers = []
-    lines = text.split("\n")
+    lines = text.split("\n")  # Split text into lines
+
     for line in lines:
-        line = line.strip()
-        if "Following Trade Marks Registration Renewed" in line:
-            break
-        columns = line.split()
-        if len(columns) == 5 and all(col.isdigit() for col in columns):
-            rc_numbers.extend(columns)
+        line = line.strip()  # Remove extra spaces
+
+        if "Following Trade Marks Registration Renewed for a Period Of Ten Years" in line:
+            break  # Stop extraction when Renewal section starts
+
+        columns = line.split()  # Splitting the line into words
+
+        if len(columns) == 5 and all(col.isdigit() for col in columns):  # Check if the line contains exactly 5 numeric columns
+            rc_numbers.extend(columns)  # Add extracted numbers
+
     return rc_numbers
 
+# Function to extract Renewal numbers
 def extract_renewal_numbers(text):
     renewal_numbers = []
     found_renewal_section = False
-    lines = text.split("\n")
+    lines = text.split("\n")  # Split text into lines
+
     for line in lines:
-        line = line.strip()
-        if "Following Trade Marks Registration Renewed" in line:
+        line = line.strip()  # Remove extra spaces
+        
+        if "Following Trade Marks Registration Renewed for a Period Of Ten Years" in line:
             found_renewal_section = True
-            continue
+            continue  # Start extraction after this line
+        
         if found_renewal_section:
-            renewal_numbers.extend(re.findall(r'\b(\d{5,})\b', line))
-            renewal_numbers.extend(re.findall(r'Application No\s+(\d{5,})', line))
+            renewal_numbers.extend(extract_numbers(line, r'\b(\d{5,})\b'))  # Extracting general 5+ digit numbers
+            renewal_numbers.extend(extract_numbers(line, r'Application No\s+(\d{5,})'))  # Extracting application numbers
+    
     return renewal_numbers
 
 # Extract numbers from a single page
@@ -80,6 +98,7 @@ def process_page(page):
     text = page.extract_text()
     if not text:
         return None
+    
     return {
         "Advertisement": extract_advertisement_numbers(text),
         "Corrigenda": extract_corrigenda_numbers(text),
@@ -89,7 +108,12 @@ def process_page(page):
 
 # Extract numbers from PDF with chunked processing
 def extract_numbers_from_pdf(pdf_file, progress_bar, chunk_size=50):
-    extracted_data = {"Advertisement": [], "Corrigenda": [], "RC": [], "Renewal": []}
+    extracted_data = {
+        "Advertisement": [],
+        "Corrigenda": [],
+        "RC": [],
+        "Renewal": [],
+    }
     try:
         logging.info(f"Processing uploaded PDF file: {pdf_file.name}")
         with pdfplumber.open(pdf_file) as pdf:
@@ -100,6 +124,7 @@ def extract_numbers_from_pdf(pdf_file, progress_bar, chunk_size=50):
             status_text = st.empty()
             processed_pages = 0
             
+            # Process pages in chunks
             for start in range(0, total_pages, chunk_size):
                 end = min(start + chunk_size, total_pages)
                 chunk_pages = pdf.pages[start:end]
@@ -107,6 +132,7 @@ def extract_numbers_from_pdf(pdf_file, progress_bar, chunk_size=50):
                 with ThreadPoolExecutor(max_workers=4) as executor:
                     futures = {executor.submit(process_page, page): i for i, page in enumerate(chunk_pages, start)}
                     
+                    # Collect results for this chunk
                     for future in as_completed(futures):
                         try:
                             result = future.result()
@@ -115,16 +141,15 @@ def extract_numbers_from_pdf(pdf_file, progress_bar, chunk_size=50):
                                     extracted_data[key].extend(result[key])
                             processed_pages += 1
                             
+                            # Update progress
                             progress_value = min(1.0, processed_pages / total_pages)
                             progress_bar.progress(progress_value)
-                            status_text.markdown(f"✅ **Processed {processed_pages} of {total_pages} pages...**", unsafe_allow_html=True)
+                            status_text.text(f"Processed {processed_pages} of {total_pages} pages...")
                         except Exception as e:
                             page_num = futures[future]
                             logging.error(f"Error processing page {page_num}: {str(e)}")
-
+            
             logging.info(f"Completed processing {total_pages} pages")
-            progress_bar.progress(1.0)
-            status_text.markdown("✅ **Processing Completed!** 🎉", unsafe_allow_html=True)
             return extracted_data
     except Exception as e:
         st.error("❌ An error occurred while processing the PDF. Check the log file for details.")
@@ -152,35 +177,36 @@ def save_to_excel(data_dict):
 # Streamlit app
 def main():
     st.set_page_config(page_title="PDF Number Extractor", page_icon="📄", layout="wide")
-
+    
     st.markdown("# INDIA TMJ")
     st.write("Extract numbers from PDF and download them as an Excel file.")
-
-    if "processing_done" not in st.session_state:
-        st.session_state.processing_done = False
-
+    
     uploaded_file = st.file_uploader("Select a PDF file", type=["pdf"])
-
+    
     if uploaded_file is not None:
         st.success(f"✅ Selected File: {uploaded_file.name}")
-
-        if not st.session_state.processing_done:
-            progress_bar = st.progress(0)
-            with st.spinner("🔄 Processing PDF..."):
-                extracted_data = extract_numbers_from_pdf(uploaded_file, progress_bar, chunk_size=50)
-
-                if extracted_data and any(extracted_data.values()):
-                    excel_file = save_to_excel(extracted_data)
-                    if excel_file:
-                        st.success("✅ Extraction Completed!")
-                        output_file_name = st.text_input("📄 Enter output file name", "extracted_numbers.xlsx")
-                        st.download_button("📥 Download Excel File", excel_file, output_file_name, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-            st.session_state.processing_done = True
-
-    if st.button("🔄 Restart Processing"):
-        st.session_state.processing_done = False
-        st.rerun()
+        
+        progress_bar = st.progress(0)
+        with st.spinner("🔄 Processing PDF..."):
+            extracted_data = extract_numbers_from_pdf(uploaded_file, progress_bar, chunk_size=50)
+            
+            if extracted_data is None:
+                st.error("❌ Processing failed. Check the log file for details.")
+            elif not any(extracted_data.values()):
+                st.warning("⚠️ No matching numbers found in the PDF.")
+            else:
+                excel_file = save_to_excel(extracted_data)
+                if excel_file:
+                    st.success("✅ Extraction Completed!")
+                    output_file_name = st.text_input("📄 Enter output file name", "extracted_numbers.xlsx")
+                    st.download_button(
+                        label="📥 Download Excel File",
+                        data=excel_file,
+                        file_name=output_file_name,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    )
+        
+        progress_bar.empty()
 
 if __name__ == "__main__":
     main()
