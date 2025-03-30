@@ -56,6 +56,7 @@ def process_page(page):
                         [col for line in t.splitlines() 
                          for col in line.split()[:5] 
                          if len(line.split()) == 5 and all(c.isdigit() for c in line.split()[:5])
+                        ]
                     )),
                     text
                 ),
@@ -76,8 +77,7 @@ def process_page(page):
 
 def fast_pdf_processing(uploaded_file, progress_bar, status_text):
     """Optimized PDF processing pipeline."""
-    data = {k: [] for k in PATTERNS.keys()}
-    data['Renewal'] = []  # Special case
+    data = {k: [] for k in ['Advertisement', 'Corrigenda', 'RC', 'Renewal']}
     
     try:
         # Read entire file into memory for faster access
@@ -117,7 +117,7 @@ def fast_pdf_processing(uploaded_file, progress_bar, status_text):
                             progress_bar.progress((i + 1) / total_pages)
             
             # Deduplicate results
-            return {k: list(set(v)) for k, v in data.items()}
+            return {k: sorted(list(set(v))) for k, v in data.items()}
             
     except Exception as e:
         logging.error(f"PDF processing failed: {str(e)}", exc_info=True)
