@@ -11,7 +11,7 @@ PATTERNS = {
     'Advertisement': re.compile(r' (\d{5,})\s+\d{2}/\d{2}/\d{4}'),
     'Corrigenda': re.compile(r' (\d{5,})\s*[-—–]'),
     'RC': re.compile(r'^(\d+\s+){4}\d+$', re.MULTILINE),
-    "Renewal" re.compile(r'(Application No\s*(\d{5,})\s*Class|(\d)(\d{5,})(\d))')
+    'Renewal': re.compile(r'(Application No\s*(\d{5,})\s*Class|(?<!\d)(\d{5,})(?!\d))') #corrected regex
 }
 
 def extract_section(text, start_marker, end_marker=None):
@@ -90,8 +90,7 @@ def extract_renewal_numbers(text):
             found_renewal_section = True
             continue
         if found_renewal_section:
-            renewal_numbers.extend(extract_numbers(line, r'\b(\d{5,})\b'))
-            renewal_numbers.extend(extract_numbers(line, r'Application No\s+(\d{5,})\s+Class'))
+            renewal_numbers.extend(extract_numbers(line, PATTERNS['Renewal']))
     return list(set(renewal_numbers))
 
 def process_page(page):
@@ -249,11 +248,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Main App Interface
-st.markdown('<h1 class="main-title">🇮🇳 TRADEMARK JOURNAL EXTRACTOR</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-title">TRADEMARK JOURNAL EXTRACTOR</h1>', unsafe_allow_html=True)
 st.markdown("""
     <p class="sub-title">
-        Extract Application Numbers from TMJ PDFs and export to Excel<br>
-        <small>Official colors of India theme</small>
+        Extract Application Numbers from TMJ PDFs in Excel
     </p>
 """, unsafe_allow_html=True)
 
@@ -270,7 +268,7 @@ if uploaded_file:
     progress_bar = st.progress(0)
     status_text = st.empty()
     
-    with st.spinner("🔍 Processing document with Indian colors..."):
+    with st.spinner("🔍 Processing PDF"):
         start_time = time.time()
         results = process_pdf(uploaded_file, progress_bar, status_text)
         processing_time = time.time() - start_time
@@ -280,8 +278,7 @@ if uploaded_file:
         status_text.empty()
         
         st.success(f"""
-            ✅ **Extraction Complete**  
-            ⏱️ Processed in {processing_time:.2f} seconds  
+            ✅ **Extraction Complete** ⏱️ Processed in {processing_time:.2f} seconds  
             🇮🇳 Powered by Indian colors
         """)
         st.balloons()
@@ -312,7 +309,7 @@ if uploaded_file:
         st.subheader("📥 Download Results")
         excel_file = generate_excel(results)
         st.download_button(
-            label="⬇️ Download Excel Report (Green for Go!)",
+            label="⬇️ Download Excel Report ",
             data=excel_file,
             file_name="tmj_results.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
