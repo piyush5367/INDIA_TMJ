@@ -16,9 +16,11 @@ renewal_pattern_7_digits = re.compile(r'\b(\d{7})\b')
 renewal_pattern_application_no = re.compile(r'Application No\s*(\d{5,})')
 
 def extract_numbers(text, pattern):
+    """Extracts numbers from text using a given regex pattern."""
     return pattern.findall(text)
 
 def extract_advertisement_numbers(text):
+    """Extracts advertisement numbers from the text."""
     numbers = []
     for line in text.splitlines():
         if "CORRIGENDA" in line:
@@ -27,6 +29,7 @@ def extract_advertisement_numbers(text):
     return numbers
 
 def extract_corrigenda_numbers(text):
+    """Extracts corrigenda numbers from the text."""
     numbers = []
     found = False
     for line in text.splitlines():
@@ -40,6 +43,7 @@ def extract_corrigenda_numbers(text):
     return numbers
 
 def extract_rc_numbers(text):
+    """Extracts RC numbers from the text."""
     numbers = []
     for line in text.splitlines():
         if "Following Trade Marks Registration Renewed" in line:
@@ -50,6 +54,7 @@ def extract_rc_numbers(text):
     return numbers
 
 def extract_renewal_numbers(text):
+    """Extracts renewal numbers from the text."""
     numbers = []
     found = False
     for line in text.splitlines():
@@ -62,6 +67,7 @@ def extract_renewal_numbers(text):
     return numbers
 
 def process_page(page):
+    """Processes a single page of the PDF to extract relevant numbers."""
     text = page.extract_text()
     if not text:
         return None
@@ -73,19 +79,21 @@ def process_page(page):
     }
 
 def extract_from_pdf(pdf_file, progress_bar, status_text):
+    """Extracts numbers from a PDF file using multithreading."""
     data = {"Advertisement": [], "Corrigenda": [], "RC": [], "Renewal": []}
     try:
         with pdfplumber.open(pdf_file) as pdf:
             pages = pdf.pages
+            total_pages = len(pages)
             with ThreadPoolExecutor(max_workers=8) as executor:
-                futures = {executor.submit(process_page, page): i for i, page in enumerate(pages)}
+                futures = [executor.submit(process_page, page) for page in pages]
                 for i, future in enumerate(as_completed(futures)):
                     result = future.result()
                     if result:
                         for key, values in result.items():
                             data[key].extend(values)
-                    progress_bar.progress((i + 1) / len(pages))
-                    status_text.markdown(f"<h4 style='text-align: center; color: #FFA500;'>Processed {i + 1}/{len(pages)} pages...</h4>", unsafe_allow_html=True)
+                    progress_bar.progress((i + 1) / total_pages)
+                    status_text.markdown(f"<h4 style='text-align: center; color: #FFA500;'>Processed {i + 1}/{total_pages} pages...</h4>", unsafe_allow_html=True)
             progress_bar.progress(1.0)
             return data
     except Exception as e:
@@ -94,8 +102,9 @@ def extract_from_pdf(pdf_file, progress_bar, status_text):
         return None
 
 def main():
+    """Main function to run the Streamlit application."""
     st.set_page_config(page_title="PDF Extractor", page_icon="📄", layout="wide")
-    st.markdown("<h1 style='text-align: center; color: #FF4B4B;'>INDIA TMJ PDF Extractor</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #FF4B4B;'>INDIA TMJ</h1>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align: center; color: #4CAF50;'>Extract Numbers from PDF</h2>", unsafe_allow_html=True)
 
     uploaded_file = st.file_uploader("Upload PDF", type=["pdf"])
