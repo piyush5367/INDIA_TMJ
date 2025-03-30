@@ -88,12 +88,11 @@ def process_page(page):
         "Renewal": extract_renewal_numbers(text),
     }
 
-def extract_numbers_from_pdf(pdf_file, progress_bar):
+def extract_numbers_from_pdf(pdf_file, progress_bar, status_text):
     extracted_data = {"Advertisement": [], "Corrigenda": [], "RC": [], "Renewal": []}
     try:
         with pdfplumber.open(pdf_file) as pdf:
             total_pages = len(pdf.pages)
-            status_text = st.empty()
             processed_pages = 0
             progress_bar.progress(0)
             with ThreadPoolExecutor(max_workers=4) as executor:
@@ -105,11 +104,12 @@ def extract_numbers_from_pdf(pdf_file, progress_bar):
                             for key in extracted_data:
                                 extracted_data[key].extend(result[key])
                         processed_pages += 1
-                        progress_bar.progress(processed_pages / total_pages)
-                        status_text.markdown(f"<h4 style='text-align: center;'>Processed {processed_pages}/{total_pages} pages...</h4>", unsafe_allow_html=True)
+                        progress_value = processed_pages / total_pages
+                        progress_bar.progress(progress_value)
+                        status_text.markdown(f"<h4 style='text-align: center; color: #FFA500;'>Processed {processed_pages}/{total_pages} pages...</h4>", unsafe_allow_html=True)
                     except Exception as e:
                         logging.error(f"Error processing page {futures[future]}: {str(e)}")
-        progress_bar.empty()
+        progress_bar.progress(1.0)
         return extracted_data
     except Exception as e:
         st.error("❌ Error processing PDF. Check logs.")
@@ -123,7 +123,9 @@ def main():
     uploaded_file = st.file_uploader("📄 Upload a PDF", type=["pdf"])
     if uploaded_file:
         progress_bar = st.progress(0)
-        extracted_data = extract_numbers_from_pdf(uploaded_file, progress_bar)
+        status_text = st.empty()
+        with st.spinner("🔄 Processing PDF..."):
+            extracted_data = extract_numbers_from_pdf(uploaded_file, progress_bar, status_text)
         if extracted_data and any(extracted_data.values()):
             st.success("✅ Extraction Completed!")
             st.markdown("<h3 style='text-align: center; color: #4CAF50;'>Preview Extracted Data</h3>", unsafe_allow_html=True)
