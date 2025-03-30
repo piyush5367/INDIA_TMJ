@@ -19,7 +19,7 @@ def load_css():
             --danger: #EF4444;          /* Red */
             --warning: #F59E0B;         /* Amber */
             --background: #F9FAFB;      /* Gray-50 */
-            --card: #FFFFFF;            /* White */
+            --card: #FFFFFF;             /* White */
             --text: #111827;            /* Gray-900 */
             --border: #E5E7EB;          /* Gray-200 */
         }
@@ -141,10 +141,17 @@ def load_css():
             border-color: var(--primary) !important;
             border-right-color: transparent !important;
         }
+
+        /* ===== Highlighted Text ===== */
+        .highlighted {
+            background-color: #FFC107; /* Amber-500, a soft yellow */
+            padding: 0.2em 0.4em;
+            border-radius: 0.3em;
+        }
     </style>
     """, unsafe_allow_html=True)
 
-# ===== Core Processing Functions (Unchanged) =====
+# ===== Core Processing Functions =====
 PATTERNS = {
     'Advertisement': re.compile(r' (\d{5,})\s+\d{2}/\d{2}/\d{4}'),
     'Corrigenda': re.compile(r' (\d{5,})\s*[-—–]'),
@@ -204,34 +211,33 @@ def extract_rc_numbers(text):
             rc_numbers.extend(columns)
     return list(set(rc_numbers))
 
-def extract_renewal_numbers(text):
+def extract_renewal_numbers(text, key_phrase, digit_length):
     renewal_numbers = []
     found_renewal_section = False
     lines = text.split("\n")
     for line in lines:
         line = line.strip()
-        if "Following Trade Marks Registration Renewed" in line:
+        if key_phrase in line:
             found_renewal_section = True
-            continue
         if found_renewal_section:
-            renewal_numbers.extend(extract_numbers(line, re.compile(r'\b(\d{5,})\b')))
-            renewal_numbers.extend(extract_numbers(line, re.compile(r'Application No\s+(\d{5,})')))
+            renewal_numbers.extend(extract_numbers(line, re.compile(r'\b(\d{5,})\b'), lambda x: len(x) >= digit_length and x.isdigit()))
+            renewal_numbers.extend(extract_numbers(line, re.compile(r'Application No\s+(\d{5,})'), lambda x: len(x) >= digit_length and x.isdigit()))
     return list(set(renewal_numbers))
 
-def process_page(page):
+def process_page(page, key_phrase, digit_length):
     try:
         text = page.extract_text() or ""
         return {
             'Advertisement': extract_advertisement_numbers(text),
             'Corrigenda': extract_corrigenda_numbers(text),
             'RC': extract_rc_numbers(text),
-            'Renewal': extract_renewal_numbers(text)
+            'Renewal': extract_renewal_numbers(text, key_phrase, digit_length)
         }
     except Exception as e:
         st.error(f"Error processing page: {str(e)}")
         return None
 
-def process_pdf(uploaded_file, progress_bar, status_text):
+def process_pdf(uploaded_file, progress_bar, status_text, key_phrase, digit_length):
     results = {category: [] for category in PATTERNS.keys()}
     try:
         with pdfplumber.open(uploaded_file) as pdf:
@@ -239,7 +245,7 @@ def process_pdf(uploaded_file, progress_bar, status_text):
             start_time = time.time()
             workers = min(8, max(4, total_pages // 10))
             with ThreadPoolExecutor(max_workers=workers) as executor:
-                futures = [executor.submit(process_page, page) for page in pdf.pages]
+                futures = [executor.submit(process_page, page, key_phrase, digit_length) for page in pdf.pages]
                 for i, future in enumerate(as_completed(futures), 1):
                     if (page_result := future.result()):
                         for category, numbers in page_result.items():
@@ -248,7 +254,7 @@ def process_pdf(uploaded_file, progress_bar, status_text):
                         progress = i / total_pages
                         progress_bar.progress(progress)
                         status_text.markdown(f"**Progress:** {progress:.1%} ({i}/{total_pages} pages)")
-                
+
                 # Clean and sort results
                 final_results = {}
                 for category, numbers in results.items():
@@ -275,21 +281,25 @@ def generate_excel(data):
             worksheet.set_column('A:A', max(15, len(category) + 5))
     return output.getvalue()
 
+def highlight_text(text, search_term):
+    """Highlights occurrences of a search term within a text."""
+    highlighted_text = re.sub(f"({re.escape(search_term)})", r'<span class="highlighted">\1</span>', text, flags=re.IGNORECASE)
+    return highlighted_text
+
 def display_results(data):
-    if not data:
-        st.error("No data was extracted from the PDF.")
-        return
-    
     st.success("✅ Extraction completed successfully!")
-    
-    tabs = st.tabs(list(data.keys()))
-    for tab, (category, numbers) in zip(tabs, data.items()):
-        with tab:
-            if numbers:
-                st.subheader(f"{category} Numbers ({len(numbers)} found)")
-                st.dataframe(numbers, height=300)
+    for category, numbers in data.items():
+        if numbers:
+            st.subheader(f"{category} Numbers ({len(numbers)} found)")
+
+            if category == "Renewal": #Highlight Renewal Numbers in the Renewal Tab (example)
+                highlighted_numbers = [highlight_text(str(num), str(num)) for num in numbers]
+                st.markdown(" ".join(highlighted_numbers), unsafe_allow_html=True)
             else:
-                st.info(f"No {category} numbers found")
+                st.dataframe(numbers, height=300)
+
+        else:
+            st.info(f"No {category} numbers found")
 
 # ===== Main App =====
 def main():
@@ -300,42 +310,105 @@ def main():
     )
     load_css()
 
-    with st.container():
-        st.markdown('<h1 class="main-title">TRADEMARK JOURNAL EXTRACTOR</h1>', unsafe_allow_html=True)
-        st.markdown('<p class="sub-title">Extract Application Numbers from TMJ PDFs in Excel</p>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-title">TRADEMARK JOURNAL EXTRACTOR</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-title">Extract Application Numbers from TMJ PDFs in Excel</p>', unsafe_allow_html=True)
 
-    with st.container():
+    input_tab, settings_tab, advertisement_tab, corrigenda_tab, rc_tab, renewal_tab = st.tabs(
+        ["Input", "Settings", "Advertisement", "Corrigenda", "RC", "Renewal"]
+    )
+
+    # ===== Input Tab =====
+    with input_tab:
         uploaded_file = st.file_uploader(
             "📄 Upload TMJ PDF File",
             type=["pdf"],
             help="Upload the Trademark Journal PDF file to extract application numbers"
         )
 
-    if uploaded_file:
+    # ===== Settings Tab =====
+    with settings_tab:
+        key_phrase = st.text_input(
+            "Renewal Key Phrase",
+            value="Following Trade Marks Registration Renewed for a Period Of Ten Years",
+            help="Enter the exact key phrase that identifies the renewal section in the PDF."
+        )
+        digit_length = st.number_input(
+            "Minimum Digit Length",
+            min_value=1,
+            value=5,
+            help="Enter the minimum number of digits for a valid application number."
+        )
+        extract_button = st.button("Extract Data")
+
+    # ===== Data Processing and Display =====
+    if uploaded_file and extract_button:
         progress_bar = st.progress(0)
         status_text = st.empty()
-        
+
         with st.spinner("🔍 Processing PDF..."):
-            results = process_pdf(uploaded_file, progress_bar, status_text)
-        
+            results = process_pdf(uploaded_file, progress_bar, status_text, key_phrase, int(digit_length))
+
         progress_bar.empty()
         status_text.empty()
-        
-        if results:
-            with st.container():
-                st.markdown('<div class="custom-card">', unsafe_allow_html=True)
-                display_results(results)
-                
-                excel_data = generate_excel(results)
-                st.download_button(
-                    label="📥 Download Excel File",
-                    data=excel_data,
-                    file_name="tmj_extracted_numbers.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-                st.markdown('</div>', unsafe_allow_html=True)
-        else:
-            st.error("No data could be extracted. Please check the file format.")
+
+        with st.container():
+            st.markdown('<div class="custom-card">', unsafe_allow_html=True)
+
+            # Display advertisement numbers
+            with advertisement_tab:
+                if results and 'Advertisement' in results:
+                    if results['Advertisement']:
+                        st.subheader(f"Advertisement Numbers ({len(results['Advertisement'])} found)")
+                        st.dataframe(results['Advertisement'], height=300)
+                    else:
+                        st.info("No Advertisement numbers found.")
+                else:
+                    st.info("No Advertisement data available.")
+
+            # Display corrigenda numbers
+            with corrigenda_tab:
+                if results and 'Corrigenda' in results:
+                    if results['Corrigenda']:
+                        st.subheader(f"Corrigenda Numbers ({len(results['Corrigenda'])} found)")
+                        st.dataframe(results['Corrigenda'], height=300)
+                    else:
+                        st.info("No Corrigenda numbers found.")
+                else:
+                    st.info("No Corrigenda data available.")
+
+            # Display RC numbers
+            with rc_tab:
+                if results and 'RC' in results:
+                    if results['RC']:
+                        st.subheader(f"RC Numbers ({len(results['RC'])} found)")
+                        st.dataframe(results['RC'], height=300)
+                    else:
+                        st.info("No RC numbers found.")
+                else:
+                    st.info("No RC data available.")
+
+            # Display renewal numbers
+            with renewal_tab:
+                if results and 'Renewal' in results:
+                    if results['Renewal']:
+                        st.subheader(f"Renewal Numbers ({len(results['Renewal'])} found)")
+                        highlighted_numbers = [highlight_text(str(num), str(num)) for num in results['Renewal']]
+                        st.markdown(" ".join(highlighted_numbers), unsafe_allow_html=True)
+                    else:
+                        st.info("No Renewal numbers found.")
+                else:
+                    st.info("No Renewal data available.")
+
+            excel_data = generate_excel(results)
+            st.download_button(
+                label="📥 Download Excel File",
+                data=excel_data,
+                file_name="tmj_extracted_numbers.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
+    elif uploaded_file is None:
+        st.info("Please upload a PDF file in the 'Input' tab.")
 
 if __name__ == "__main__":
     main()
