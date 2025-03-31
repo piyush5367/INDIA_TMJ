@@ -50,55 +50,51 @@ def extract_corrigenda_numbers(text: str) -> List[str]:
 
     return corrigenda_numbers
 
+def extract_numbers(text: str, pattern: str) -> List[str]:
+    """Helper function to extract numbers from a line using a given regex pattern."""
+    return re.findall(pattern, text)
+
 def extract_rc_numbers(text: str) -> List[str]:
-    """Extract RC numbers between specified start and stop markers."""
+    """Extract RC numbers from text based on specific line structure."""
     rc_numbers = []
-    start_extraction = False
     lines = text.split("\n")
     
-    start_marker = "FOLLOWING TRADE MARK APPLICATIONS HAVE BEEN REGISTERED AND REGISTRATION CERTIFICATES ARE AVAILABLE ON THE OFFICIAL WEBSITE"
-    stop_marker = "FOLLOWING TRADE MARKS REGISTRATION RENEWED FOR A PERIOD OF TEN YEARS"
-
     for line in lines:
         line = line.strip()
-        upper_line = line.upper()
-
-        # Start extraction when marker is found
-        if start_marker in upper_line:
-            start_extraction = True
-            continue
-            
-        # Stop extraction when marker is found
-        if stop_marker in upper_line:
-            start_extraction = False
+        
+        # Stop when we reach the "Renewed" section
+        if "FOLLOWING TRADE MARKS REGISTRATION RENEWED FOR A PERIOD OF TEN YEARS" in line.upper():
             break
-            
-        # Extract 5+ digit numbers when in extraction mode
-        if start_extraction:
-            matches = re.findall(r'\b\d{5,}\b', line)
-            rc_numbers.extend(matches)
-
+        
+        # Check if line has exactly 5 columns and all columns are digits (assuming RC numbers are in such lines)
+        columns = line.split()
+        if len(columns) == 5 and all(col.isdigit() for col in columns):
+            rc_numbers.extend(columns)
+    
     return rc_numbers
 
 def extract_renewal_numbers(text: str) -> List[str]:
-    """Extract renewal numbers from text."""
+    """Extract renewal numbers from text after a specific section."""
     renewal_numbers = []
-    in_renewal_section = False
+    found_renewal_section = False
     lines = text.split("\n")
-
+    
     for line in lines:
         line = line.strip()
-        upper_line = line.upper()
-
-        if "FOLLOWING TRADE MARKS REGISTRATION RENEWED FOR A PERIOD OF TEN YEARS" in upper_line:
-            in_renewal_section = True
-            continue
-        if in_renewal_section:
-            # Skip lines that might be section headers
-            if any(word in upper_line for word in ["PAGE", "SECTION", "VOLUME"]):
-                continue
-            matches = re.findall(r'\b\d{5,}\b', line)
-            renewal_numbers.extend(matches)
+        
+        # Look for the marker to begin extraction
+        if "FOLLOWING TRADE MARKS REGISTRATION RENEWED FOR A PERIOD OF TEN YEARS" in line.upper():
+            found_renewal_section = True
+            continue  # Skip this line, as it is just the marker
+        
+        # If we're in the renewal section, extract numbers
+        if found_renewal_section:
+            # First pattern: look for numbers with 5 or more digits
+            renewal_numbers.extend(extract_numbers(line, r'\b(\d{5,})\b'))
+            
+            # Second pattern: look for 'Application No' followed by a number
+            renewal_numbers.extend(extract_numbers(line, r'Application No\s+(\d{5,})'))
+    
     return renewal_numbers
 
 def extract_numbers_from_pdf(pdf_file) -> Dict[str, List[str]]:
