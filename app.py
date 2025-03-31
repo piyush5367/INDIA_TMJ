@@ -51,24 +51,30 @@ def extract_corrigenda_numbers(text: str) -> List[str]:
     return corrigenda_numbers
 
 def extract_rc_numbers(text: str) -> List[str]:
-    """Extract RC numbers from text."""
+    """Extract RC numbers between specified start and stop markers."""
     rc_numbers = []
-    in_rc_section = False
+    start_extraction = False
     lines = text.split("\n")
+    
+    start_marker = "FOLLOWING TRADE MARK APPLICATIONS HAVE BEEN REGISTERED AND REGISTRATION CERTIFICATES ARE AVAILABLE ON THE OFFICIAL WEBSITE"
+    stop_marker = "FOLLOWING TRADE MARKS REGISTRATION RENEWED FOR A PERIOD OF TEN YEARS"
 
     for line in lines:
         line = line.strip()
         upper_line = line.upper()
 
-        if "FOLLOWING TRADE MARKS REGISTRATION RENEWED FOR A PERIOD OF TEN YEARS" in upper_line:
-            in_rc_section = True
+        # Start extraction when marker is found
+        if start_marker in upper_line:
+            start_extraction = True
             continue
-
-        if in_rc_section:
-            # Skip lines that might be section headers
-            if any(word in upper_line for word in ["PAGE", "SECTION", "VOLUME"]):
-                continue
-            # Extract all 5+ digit numbers in this section
+            
+        # Stop extraction when marker is found
+        if stop_marker in upper_line:
+            start_extraction = False
+            break
+            
+        # Extract 5+ digit numbers when in extraction mode
+        if start_extraction:
             matches = re.findall(r'\b\d{5,}\b', line)
             rc_numbers.extend(matches)
 
@@ -95,23 +101,6 @@ def extract_renewal_numbers(text: str) -> List[str]:
             renewal_numbers.extend(matches)
     return renewal_numbers
 
-def extract_registered_tm_numbers(text: str) -> List[str]:
-    """Extract numbers from the "Registered TM" section, within 5 lines."""
-    registered_numbers = []
-    start_indices = [m.start() for m in re.finditer(
-        "FOLLOWING TRADE MARK APPLICATIONS HAVE BEEN REGISTERED", text
-    )]
-
-    for start_index in start_indices:
-        # Extract the 5 lines following the phrase
-        lines = text[start_index:].splitlines()[:6]  # Extract up to 6 lines
-
-        # Extract numbers from each of the 5 lines
-        for line in lines:
-            numbers = re.findall(r'\b\d{5,}\b', line)
-            registered_numbers.extend(numbers)
-    return registered_numbers
-
 def extract_numbers_from_pdf(pdf_file) -> Dict[str, List[str]]:
     """Main function to extract numbers from PDF."""
     extracted_data = {
@@ -119,7 +108,6 @@ def extract_numbers_from_pdf(pdf_file) -> Dict[str, List[str]]:
         "Corrigenda": [],
         "RC": [],
         "Renewal": [],
-        "Registered TM": [],  # Added for Registered TM numbers
     }
 
     try:
@@ -141,7 +129,6 @@ def extract_numbers_from_pdf(pdf_file) -> Dict[str, List[str]]:
             extracted_data["Corrigenda"] = extract_corrigenda_numbers(full_text)
             extracted_data["RC"] = extract_rc_numbers(full_text)
             extracted_data["Renewal"] = extract_renewal_numbers(full_text)
-            extracted_data["Registered TM"] = extract_registered_tm_numbers(full_text) # Extract Registered TM
 
     except Exception as e:
         st.error(f"Error processing PDF: {str(e)}")
@@ -212,13 +199,12 @@ def main():
 
                 # Show summary
                 st.subheader("📊 Extraction Summary")
-                cols = st.columns(5)  # Adjust for the new category
+                cols = st.columns(4)  # Changed from 5 to 4 columns
                 metrics = {
                     "Advertisement": "📢",
                     "Corrigenda": "✏️",
                     "RC": "📄",
                     "Renewal": "🔄",
-                    "Registered TM": "✅", # Add Registered TM
                 }
 
                 for i, (category, numbers) in enumerate(extracted_data.items()):
