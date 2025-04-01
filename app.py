@@ -6,15 +6,42 @@ import logging
 from io import BytesIO
 from typing import Dict, List, Optional
 
-# Configure logging
-logging.basicConfig(filename="pdf_extraction.log", level=logging.INFO, 
-                   format="%(asctime)s - %(message)s")
+# ================== STREAMLIT CONFIG (MUST BE FIRST) ================== #
+st.set_page_config(
+    page_title="TMJ Number Extractor",
+    layout="wide",
+    page_icon="📄"
+)
 
+# ================== CUSTOM UI STYLES ================== #
+# 1. Custom Fonts
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Playfair+Display:wght@700&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Roboto', sans-serif;
+}
+h1, h2, h3 {
+    font-family: 'Playfair Display', serif;
+    color: #2F4F4F !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# 2. Gradient Header
+st.markdown("""
+<style>
+[data-testid="stHeader"] {
+    background: linear-gradient(90deg, #1E3A8A, #4B8BBE);
+    color: white;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ================== CORE LOGIC (UNCHANGED) ================== #
 class TMJNumberExtractor:
-    """Extracts numbers from Trade Marks Journal PDFs"""
-    
     def __init__(self):
-        # Configure section markers (case insensitive)
         self.section_markers = {
             'corrigenda': 'CORRIGENDA',
             'renewal': 'FOLLOWING TRADE MARKS REGISTRATION RENEWED',
@@ -22,300 +49,169 @@ class TMJNumberExtractor:
             'pr_section': 'PR SECTION'
         }
         
-        # Configure patterns
         self.patterns = {
             'advertisement': r'(\d{5,})\s+\d{2}/\d{2}/\d{4}',
             'corrigenda': r'(\d{5,})',
             'rc': r'\b\d{5,}\b',
-            'renewal': [
-                r'\b(\d{5,})\b',
-                r'Application No\s+(\d{5,})'
-            ],
+            'renewal': [r'\b(\d{5,})\b', r'Application No\s+(\d{5,})'],
             'pr_section': r'(\d{5,})\s*-'
         }
         
-        # Validation rules
         self.min_number_length = 5
         self.max_number_length = None 
-        
-        # Configure logging
         self.logger = logging.getLogger(__name__)
 
     def _clean_number(self, number: str) -> str:
-        """Clean extracted number by removing non-digit characters"""
-        if not isinstance(number, str):
-            return ""
-        return re.sub(r"[^\d]", "", number)
+        return re.sub(r"[^\d]", "", str(number))
 
     def _validate_number(self, number: str) -> bool:
-        """Validate extracted number meets criteria"""
         clean_num = self._clean_number(number)
-        if not clean_num:
-            return False
         return (clean_num.isdigit() and 
                 len(clean_num) >= self.min_number_length and
                 (self.max_number_length is None or len(clean_num) <= self.max_number_length))
 
     def _remove_duplicates(self, numbers: List[str]) -> List[str]:
-        """Remove duplicates while preserving order"""
         seen = set()
         return [n for n in numbers if not (n in seen or seen.add(n))]
 
     def extract_numbers(self, text: str, pattern: str) -> List[str]:
-        """Generic number extractor with validation"""
-        if not text or not isinstance(text, str):
-            return []
-            
+        if not text: return []
         try:
-            matches = re.findall(pattern, text)
-            return [m for m in matches if self._validate_number(m)]
+            return [m for m in re.findall(pattern, text) if self._validate_number(m)]
         except Exception as e:
-            self.logger.error(f"Regex error with pattern {pattern}: {e}")
+            self.logger.error(f"Regex error: {e}")
             return []
 
     def extract_advertisement_numbers(self, text: str) -> List[str]:
-        """Extract advertisement numbers before corrigenda section"""
-        if not text:
-            return []
-
         numbers = []
-        lines = text.split('\n')
-        
-        for line in lines:
-            line = line.strip()
-            if self.section_markers['corrigenda'].upper() in line.upper():
-                break
+        for line in text.split('\n'):
+            if self.section_markers['corrigenda'].upper() in line.upper(): break
             numbers.extend(self.extract_numbers(line, self.patterns['advertisement']))
-            
         return self._remove_duplicates(numbers)
 
     def extract_corrigenda_numbers(self, text: str) -> List[str]:
-        """Extract corrigenda numbers between corrigenda and registered sections"""
-        if not text:
-            return []
-
         numbers = []
-        found_corrigenda_section = False
-        lines = text.split("\n")
-        
-        for line in lines:
-            line = line.strip()
+        found_section = False
+        for line in text.split('\n'):
             if self.section_markers['corrigenda'].upper() in line.upper():
-                found_corrigenda_section = True
+                found_section = True
                 continue
-                
-            if self.section_markers['registered'].upper() in line.upper():
-                break
-                
-            if found_corrigenda_section:
-                matches = re.findall(r'(\d{5,})\s*[ ]', line)
-                numbers.extend(matches)
-                
+            if self.section_markers['registered'].upper() in line.upper(): break
+            if found_section:
+                numbers.extend(re.findall(r'(\d{5,})\s*[ ]', line))
         return self._remove_duplicates(numbers)
 
     def extract_rc_numbers(self, text: str) -> List[str]:
-        """Extract RC numbers before renewal section"""
-        if not text:
-            return []
-
         numbers = []
-        lines = text.split("\n")
-        
-        for line in lines:
-            line = line.strip()
-            if self.section_markers['renewal'].upper() in line.upper():
-                break
-                
-            columns = line.split()
-            if len(columns) == 5 and all(col.isdigit() for col in columns):
-                numbers.extend(columns)
-                
+        for line in text.split('\n'):
+            if self.section_markers['renewal'].upper() in line.upper(): break
+            if len(cols := line.split()) == 5 and all(col.isdigit() for col in cols):
+                numbers.extend(cols)
         return self._remove_duplicates(numbers)
 
     def extract_renewal_numbers(self, text: str) -> List[str]:
-        """Extract renewal numbers after renewal section header"""
-        if not text:
-            return []
-
         numbers = []
         in_section = False
-        lines = text.split('\n')
-        
-        for line in lines:
-            line = line.strip()
+        for line in text.split('\n'):
             if self.section_markers['renewal'].upper() in line.upper():
                 in_section = True
                 continue
-                
             if in_section:
                 for pattern in self.patterns['renewal']:
                     numbers.extend(self.extract_numbers(line, pattern))
-                    
         return self._remove_duplicates(numbers)
 
     def extract_pr_section_numbers(self, text: str) -> List[str]:
-        """Extract PR Section numbers (format: '123456 -') from text"""
-        if not text:
-            return []
-
         numbers = []
         in_section = False
-        lines = text.split('\n')
-        
-        for line in lines:
-            line = line.strip()
-            upper_line = line.upper()
-            
-            if self.section_markers['pr_section'].upper() in upper_line:
+        for line in text.split('\n'):
+            if self.section_markers['pr_section'].upper() in line.upper():
                 in_section = True
                 continue
-                
             if in_section:
-                matches = self.extract_numbers(line, self.patterns['pr_section'])
-                numbers.extend(matches)
-                
+                numbers.extend(self.extract_numbers(line, self.patterns['pr_section']))
         return self._remove_duplicates(numbers)
 
     def process_pdf(self, pdf_file) -> Dict[str, List[str]]:
-        """Process PDF and return all extracted numbers"""
-        extracted_data = {
-            'advertisement': [],
-            'corrigenda': [],
-            'rc': [],
-            'renewal': [],
-            'pr_section': []
-        }
-        
+        extracted_data = {k: [] for k in self.section_markers}
         if not pdf_file:
             st.error("No file uploaded.")
             return extracted_data
 
         try:
             with pdfplumber.open(pdf_file) as pdf:
-                total_pages = len(pdf.pages)
-                if total_pages == 0:
-                    st.warning("PDF is empty.")
-                    return extracted_data
-
                 progress_bar = st.progress(0)
                 for i, page in enumerate(pdf.pages):
-                    try:
-                        text = page.extract_text() or ""
-                        extracted_data['advertisement'].extend(self.extract_advertisement_numbers(text))
-                        extracted_data['corrigenda'].extend(self.extract_corrigenda_numbers(text))
-                        extracted_data['rc'].extend(self.extract_rc_numbers(text))
-                        extracted_data['renewal'].extend(self.extract_renewal_numbers(text))
-                        extracted_data['pr_section'].extend(self.extract_pr_section_numbers(text))
-                        progress_bar.progress((i + 1) / total_pages)
-                    except Exception as e:
-                        logging.error(f"Page {i+1} processing error: {e}")
-                        continue
+                    text = page.extract_text() or ""
+                    extracted_data['advertisement'].extend(self.extract_advertisement_numbers(text))
+                    extracted_data['corrigenda'].extend(self.extract_corrigenda_numbers(text))
+                    extracted_data['rc'].extend(self.extract_rc_numbers(text))
+                    extracted_data['renewal'].extend(self.extract_renewal_numbers(text))
+                    extracted_data['pr_section'].extend(self.extract_pr_section_numbers(text))
+                    progress_bar.progress((i + 1) / len(pdf.pages))
         except Exception as e:
-            st.error(f"Failed to process PDF: {e}")
-            logging.error(f"PDF processing error: {e}")
+            st.error(f"PDF processing error: {e}")
+            logging.error(f"PDF error: {e}")
         
-        # Deduplicate across all pages
-        for key in extracted_data:
-            extracted_data[key] = self._remove_duplicates(extracted_data[key])
-            
-        return extracted_data
+        return {k: self._remove_duplicates(v) for k, v in extracted_data.items()}
 
     def save_to_excel(self, data_dict: Dict[str, List[str]]) -> Optional[bytes]:
-        """Generate Excel file from extracted data"""
         try:
             output = BytesIO()
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
                 for sheet_name, numbers in data_dict.items():
                     if numbers:
-                        try:
-                            clean_numbers = [int(self._clean_number(n)) for n in numbers]
-                            df = pd.DataFrame(sorted(set(clean_numbers)), columns=["Trade Mark Number"])
-                            df.to_excel(writer, index=False, sheet_name=sheet_name[:31])
-                        except Exception as e:
-                            logging.error(f"Error writing {sheet_name} to Excel: {e}")
-                            continue
+                        df = pd.DataFrame(
+                            sorted({int(self._clean_number(n)) for n in numbers}),
+                            columns=["Trade Mark Number"]
+                        )
+                        df.to_excel(writer, index=False, sheet_name=sheet_name[:31])
             output.seek(0)
             return output.getvalue()
         except Exception as e:
-            st.error(f"Failed to create Excel file: {e}")
-            logging.error(f"Excel error: {e}")
+            st.error(f"Excel error: {e}")
             return None
 
 def main():
-    """Streamlit application"""
     try:
-        # ================== UI ENHANCEMENTS ================== #
-        # 1. Custom Fonts
-        st.markdown("""
-        <style>
-        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Playfair+Display:wght@700&display=swap');
-        
-        html, body, [class*="css"] {
-            font-family: 'Roboto', sans-serif;
-        }
-        h1, h2, h3 {
-            font-family: 'Playfair Display', serif;
-            color: #2F4F4F !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
-        # 3. Gradient Header
-        st.markdown("""
-        <style>
-        [data-testid="stHeader"] {
-            background: linear-gradient(90deg, #1E3A8A, #4B8BBE);
-            color: white;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
-        # ================== MAIN APP ================== #
-        st.set_page_config(page_title="TMJ Number Extractor", layout="wide")
         st.title("INDIA TMJ Number Extractor")
-        
-        # File upload
         uploaded_file = st.file_uploader("Upload Trade Marks Journal PDF", type=["pdf"])
         
-        if uploaded_file is not None:
-            st.write(f"Processing: **{uploaded_file.name}**")
-            
-            # Initialize extractor
+        if uploaded_file:
             extractor = TMJNumberExtractor()
-            
-            with st.spinner("Extracting numbers from PDF..."):
+            with st.spinner("Extracting numbers..."):
                 extracted_data = extractor.process_pdf(uploaded_file)
                 excel_data = extractor.save_to_excel(extracted_data)
             
             if any(extracted_data.values()):
-                st.success("Extraction completed successfully!")
-                
-                # Display results in tabs
+                st.success("Extraction completed!")
                 tabs = st.tabs([f"📰 {k.replace('_', ' ').title()}" for k in extracted_data.keys()])
+                
                 for tab, (category, numbers) in zip(tabs, extracted_data.items()):
                     with tab:
                         if numbers:
                             st.write(f"Found {len(numbers)} {category.replace('_', ' ')} numbers")
-                            clean_numbers = [int(extractor._clean_number(n)) for n in numbers]
-                            df = pd.DataFrame(sorted(set(clean_numbers)), columns=["Trade Mark Number"])
+                            df = pd.DataFrame(
+                                sorted({int(extractor._clean_number(n)) for n in numbers}),
+                                columns=["Trade Mark Number"]
+                            )
                             st.dataframe(df, height=400, use_container_width=True)
                         else:
-                            st.info(f"No {category.replace('_', ' ')} numbers found.")
+                            st.info(f"No {category.replace('_', ' ')} numbers found")
                 
-                # Download button
                 if excel_data:
                     st.download_button(
-                        label="📥 Download Excel File",
-                        data=excel_data,
+                        "📥 Download Excel",
+                        excel_data,
                         file_name=f"tmj_numbers_{uploaded_file.name.split('.')[0]}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
             else:
-                st.warning("No numbers extracted from the PDF.")
+                st.warning("No numbers found in PDF")
                 
     except Exception as e:
-        st.error(f"Application error: {e}")
-        logging.error(f"Application error: {e}")
+        st.error(f"Error: {e}")
 
 if __name__ == "__main__":
+    logging.basicConfig(filename="app.log", level=logging.ERROR)
     main()
