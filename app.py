@@ -1,9 +1,7 @@
-import os
 import re
 import pdfplumber
 import pandas as pd
 import streamlit as st
-import openpyxl
 import logging
 from io import BytesIO
 
@@ -12,25 +10,18 @@ logging.basicConfig(filename="pdf_extraction.log", level=logging.INFO, format="%
 
 # Function to extract numbers using regex
 def extract_numbers(text, pattern):
-    return list(map(int, re.findall(pattern, text)))
+    return re.findall(pattern, text)
 
 # Function to extract Advertisement numbers
 def extract_advertisement_numbers(text):
     advertisement_numbers = []
     lines = text.split("\n")
-    
     for line in lines:
-        line = line.strip()  # Clean up the line
+        line = line.strip()
         if "CORRIGENDA" in line:
-            break  # Stop if "CORRIGENDA" section is reached
-        
-        # Corrected regex to capture advertisement numbers followed by a date (dd/mm/yyyy)
+            break
         matches = re.findall(r'(\d{5,})\s+\d{2}/\d{2}/\d{4}', line)
-        
-        if matches:
-            logging.info(f"Found advertisement numbers: {matches} in line: {line}")  # Log the matches
-        advertisement_numbers.extend(matches)  # Add found numbers to the list
-    
+        advertisement_numbers.extend(matches)
     return advertisement_numbers  
 
 # Function to extract Corrigenda numbers
@@ -43,10 +34,10 @@ def extract_corrigenda_numbers(text):
         if "CORRIGENDA" in line:
             found_corrigenda_section = True
             continue
-        if "Following Trade Mark applications have been Registered and registration certificates are available on the official website" in line:
+        if "Following Trade Mark applications have been Registered" in line:
             break
         if found_corrigenda_section:
-            matches = re.findall(r' (\d{5,})\s*', line)
+            matches = re.findall(r'(\d{5,})', line)
             corrigenda_numbers.extend(matches)
     return corrigenda_numbers
 
@@ -56,11 +47,10 @@ def extract_rc_numbers(text):
     lines = text.split("\n")
     for line in lines:
         line = line.strip()
-        if "Following Trade Marks Registration Renewed for a Period Of Ten Years" in line:
+        if "Following Trade Marks Registration Renewed" in line:
             break
-        columns = line.split()
-        if len(columns) == 5 and all(col.isdigit() for col in columns):
-            rc_numbers.extend(columns)
+        matches = re.findall(r'\b\d{5,}\b', line)
+        rc_numbers.extend(matches)
     return rc_numbers
 
 # Function to extract Renewal numbers
@@ -70,45 +60,40 @@ def extract_renewal_numbers(text):
     lines = text.split("\n")
     for line in lines:
         line = line.strip()
-        if "Following Trade Marks Registration Renewed for a Period Of Ten Years" in line:
+        if "Following Trade Marks Registration Renewed" in line:
             found_renewal_section = True
             continue
         if found_renewal_section:
-            renewal_numbers.extend(extract_numbers(line, r'\b(\d{5,})\b'))
-            renewal_numbers.extend(extract_numbers(line, r'Application No\s+(\d{5,}) '))
+            matches = re.findall(r'\b(\d{5,})\b', line)
+            renewal_numbers.extend(matches)
     return renewal_numbers
 
 # Optimized PDF extraction with progress feedback
 def extract_numbers_from_pdf(pdf_file):
     extracted_data = {"Advertisement": [], "Corrigenda": [], "RC": [], "Renewal": []}
+    
     try:
         with pdfplumber.open(pdf_file) as pdf:
             total_pages = len(pdf.pages)
             if total_pages == 0:
                 st.warning("PDF is empty.")
                 return extracted_data
+
             progress_bar = st.progress(0)
-            chunk_size = 5  # Reduced chunk size for faster feedback
-            with st.spinner('Processing PDF...'):
-                for start in range(0, total_pages, chunk_size):
-                    end = min(start + chunk_size, total_pages)
-                    for i in range(start, end):
-                        page = pdf.pages[i]
-                        text = page.extract_text() or ""  # Ensure text extraction is not None
-                        
-                        # Log progress for each page
-                        logging.info(f"Extracting from page {i + 1}/{total_pages}")
-                        
-                        extracted_data["Advertisement"].extend(extract_advertisement_numbers(text))
-                        extracted_data["Corrigenda"].extend(extract_corrigenda_numbers(text))
-                        extracted_data["RC"].extend(extract_rc_numbers(text))
-                        extracted_data["Renewal"].extend(extract_renewal_numbers(text))
-                        
-                        progress_bar.progress((i + 1) / total_pages)
-                        logging.info(f"Processed page {i + 1} of {total_pages}")  # Log page processed
+            
+            for i, page in enumerate(pdf.pages):
+                text = page.extract_text() or ""
+                extracted_data["Advertisement"].extend(extract_advertisement_numbers(text))
+                extracted_data["Corrigenda"].extend(extract_corrigenda_numbers(text))
+                extracted_data["RC"].extend(extract_rc_numbers(text))
+                extracted_data["Renewal"].extend(extract_renewal_numbers(text))
+                
+                progress_bar.progress((i + 1) / total_pages)
+        
     except Exception as e:
-        st.error(f"Failed to process PDF: {str(e)}")
-        logging.error(f"PDF processing error: {str(e)}")
+        st.error(f"Error processing PDF: {e}")
+        logging.error(f"PDF processing error: {e}")
+
     return extracted_data
 
 # Optimized Excel saving
@@ -118,65 +103,50 @@ def save_to_excel(data_dict):
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             for sheet_name, numbers in data_dict.items():
                 if numbers:
-                    numbers = sorted(set(map(int, numbers)))  # Remove duplicates and sort
-                    df = pd.DataFrame(numbers, columns=["Numbers"])
+                    df = pd.DataFrame(sorted(set(map(int, numbers))), columns=["Numbers"])
                     df.to_excel(writer, index=False, sheet_name=sheet_name)
         output.seek(0)
         return output.getvalue() if any(data_dict.values()) else None
     except Exception as e:
-        st.error(f"Failed to create Excel file: {str(e)}")
-        logging.error(f"Excel creation error: {str(e)}")
+        st.error(f"Error creating Excel file: {e}")
+        logging.error(f"Excel error: {e}")
         return None
 
-# Streamlit app with optimizations
+# Streamlit app
 def main():
-    st.title("INDIA TMJ")  # Title centered by default in Streamlit
-
-    # Initialize session state
-    if "extracted_data" not in st.session_state:
-        st.session_state.extracted_data = None
-    if "excel_data" not in st.session_state:
-        st.session_state.excel_data = None
-    if "file_name" not in st.session_state:
-        st.session_state.file_name = None
+    st.set_page_config(page_title="INDIA TMJ", layout="wide")
+    st.title("INDIA TMJ - PDF Extraction")
 
     # File uploader
-    uploaded_file = st.file_uploader("Choose a PDF file", type=["pdf"], key="pdf_uploader")
+    uploaded_file = st.file_uploader("Choose a PDF file", type=["pdf"])
 
-    if uploaded_file is not None:
-        file_name = uploaded_file.name
-        st.write(f"Selected file: {file_name}")
+    if uploaded_file:
+        st.write(f"Processing: **{uploaded_file.name}**")
 
-        # Extract numbers from PDF and display them
         extracted_data = extract_numbers_from_pdf(uploaded_file)
-        
-        # Save to Excel
-        st.session_state.extracted_data = extracted_data
-        st.session_state.excel_data = save_to_excel(extracted_data)
+        excel_data = save_to_excel(extracted_data)
 
-        # Display results if available
-        if st.session_state.extracted_data is not None:
-            if st.session_state.excel_data:
-                st.success("Extraction completed successfully!")
-                
-                # Preview extracted data
-                st.subheader("Extracted Numbers Preview:")
-                for category, numbers in st.session_state.extracted_data.items():
-                    if numbers:
-                        st.write(f"{category}: {len(numbers)} numbers found")
-                        df = pd.DataFrame(sorted(set(map(int, numbers))), columns=["Numbers"])
-                        st.dataframe(df, height=200)
+        # Display results
+        if extracted_data:
+            st.success("Extraction completed successfully!")
+            st.subheader("Extracted Data Preview:")
+            
+            for category, numbers in extracted_data.items():
+                if numbers:
+                    st.write(f"**{category}:** {len(numbers)} numbers found")
+                    df = pd.DataFrame(sorted(set(map(int, numbers))), columns=["Numbers"])
+                    st.dataframe(df, height=200)
 
-                # Download button
+            # Download button
+            if excel_data:
                 st.download_button(
-                    label="Download Excel File",
-                    data=st.session_state.excel_data,
-                    file_name=f"extracted_numbers_{file_name.split('.')[0]}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="download_button"
+                    label="📥 Download Excel File",
+                    data=excel_data,
+                    file_name=f"extracted_numbers_{uploaded_file.name.split('.')[0]}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
             else:
-                st.warning("No numbers found matching the specified patterns.")
-                
+                st.warning("No data extracted.")
+
 if __name__ == "__main__":
     main()
