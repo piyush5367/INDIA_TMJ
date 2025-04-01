@@ -271,7 +271,7 @@ def main():
                 for tab, (category, numbers) in zip(tabs, extracted_data.items()):
                     with tab:
                         if numbers:
-                            st.write(f"Found {len(numbers):.0f} {category} numbers")  
+                            st.write(f"Found {len(numbers)} {category} numbers")  
                             try:
                                 # Display cleaned numbers without commas
                                 clean_numbers = [int(extractor._clean_number(n)) for n in numbers]
