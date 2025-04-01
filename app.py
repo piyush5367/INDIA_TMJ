@@ -19,10 +19,8 @@ def extract_advertisement_numbers(text):
     advertisement_numbers = []
     lines = text.split("\n")
     
-    # Loop through each line to find advertisement numbers
     for line in lines:
         line = line.strip()  # Clean up the line
-        
         if "CORRIGENDA" in line:
             break  # Stop if "CORRIGENDA" section is reached
         
@@ -90,18 +88,24 @@ def extract_numbers_from_pdf(pdf_file):
                 st.warning("PDF is empty.")
                 return extracted_data
             progress_bar = st.progress(0)
-            chunk_size = 10
-            for start in range(0, total_pages, chunk_size):
-                end = min(start + chunk_size, total_pages)
-                for i in range(start, end):
-                    page = pdf.pages[i]
-                    text = page.extract_text() or ""  # Ensure text extraction is not None
-                    
-                    extracted_data["Advertisement"].extend(extract_advertisement_numbers(text))
-                    extracted_data["Corrigenda"].extend(extract_corrigenda_numbers(text))
-                    extracted_data["RC"].extend(extract_rc_numbers(text))
-                    extracted_data["Renewal"].extend(extract_renewal_numbers(text))
-                    progress_bar.progress((i + 1) / total_pages)
+            chunk_size = 5  # Reduced chunk size for faster feedback
+            with st.spinner('Processing PDF...'):
+                for start in range(0, total_pages, chunk_size):
+                    end = min(start + chunk_size, total_pages)
+                    for i in range(start, end):
+                        page = pdf.pages[i]
+                        text = page.extract_text() or ""  # Ensure text extraction is not None
+                        
+                        # Log progress for each page
+                        logging.info(f"Extracting from page {i + 1}/{total_pages}")
+                        
+                        extracted_data["Advertisement"].extend(extract_advertisement_numbers(text))
+                        extracted_data["Corrigenda"].extend(extract_corrigenda_numbers(text))
+                        extracted_data["RC"].extend(extract_rc_numbers(text))
+                        extracted_data["Renewal"].extend(extract_renewal_numbers(text))
+                        
+                        progress_bar.progress((i + 1) / total_pages)
+                        logging.info(f"Processed page {i + 1} of {total_pages}")  # Log page processed
     except Exception as e:
         st.error(f"Failed to process PDF: {str(e)}")
         logging.error(f"PDF processing error: {str(e)}")
@@ -114,7 +118,7 @@ def save_to_excel(data_dict):
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             for sheet_name, numbers in data_dict.items():
                 if numbers:
-                    numbers = sorted(set(map(int, numbers)))
+                    numbers = sorted(set(map(int, numbers)))  # Remove duplicates and sort
                     df = pd.DataFrame(numbers, columns=["Numbers"])
                     df.to_excel(writer, index=False, sheet_name=sheet_name)
         output.seek(0)
@@ -126,7 +130,7 @@ def save_to_excel(data_dict):
 
 # Streamlit app with optimizations
 def main():
-    st.title("INDIA TMJ")  # Using Streamlit's built-in title function (no HTML for centering)
+    st.title("INDIA TMJ")  # Title centered by default in Streamlit
 
     # Initialize session state
     if "extracted_data" not in st.session_state:
