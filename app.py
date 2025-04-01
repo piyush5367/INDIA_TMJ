@@ -97,10 +97,6 @@ def extract_numbers_from_pdf(pdf_file):
                     page = pdf.pages[i]
                     text = page.extract_text() or ""  # Ensure text extraction is not None
                     
-                    # Debugging: Show a preview of the extracted text to check if it's correct
-                    st.write(f"--- Text from page {i+1} ---")
-                    st.text(text[:500])  # Preview first 500 characters of extracted text
-                    
                     extracted_data["Advertisement"].extend(extract_advertisement_numbers(text))
                     extracted_data["Corrigenda"].extend(extract_corrigenda_numbers(text))
                     extracted_data["RC"].extend(extract_rc_numbers(text))
@@ -130,7 +126,8 @@ def save_to_excel(data_dict):
 
 # Streamlit app with optimizations
 def main():
-    st.title("INDIA TMJ")
+    # Center the title using Markdown and HTML
+    st.markdown("<h1 style='text-align: center;'>INDIA TMJ</h1>", unsafe_allow_html=True)
 
     # Initialize session state
     if "extracted_data" not in st.session_state:
