@@ -36,14 +36,10 @@ class TMJNumberExtractor:
         
         # Validation rules
         self.min_number_length = 5
-        self.max_number_length = 7
+        self.max_number_length = none 
         
         # Configure logging
         self.logger = logging.getLogger(__name__)
-
-    def _clean_number(self, number: str) -> str:
-        """Remove commas from numbers while keeping original for display"""
-        return number.replace(',', '')
 
     def _validate_number(self, number: str) -> bool:
         """Validate extracted number meets criteria"""
@@ -243,7 +239,6 @@ def main():
     """Streamlit application"""
     try:
         st.set_page_config(page_title="INDIA TMJ Extractor", layout="wide")
-        st.title("INDIA Trade Marks Journal Number Extractor")
         
         # File upload
         uploaded_file = st.file_uploader("Upload PDF", type=["pdf"], 
@@ -255,7 +250,7 @@ def main():
             # Initialize extractor
             extractor = TMJNumberExtractor()
             
-            with st.spinner("Extracting numbers from PDF..."):
+            with st.spinner("Analyze your document..."):
                 extracted_data = extractor.process_pdf(uploaded_file)
                 excel_data = save_to_excel(extracted_data)
             
@@ -267,13 +262,13 @@ def main():
                 for tab, (category, numbers) in zip(tabs, extracted_data.items()):
                     with tab:
                         if numbers:
-                            st.write(f"Found {len(numbers)} {category} numbers")
+                            st.write(f"Found {len(numbers):.0f} {category} numbers")  
                             try:
                                 # Display cleaned numbers without commas
                                 clean_numbers = [int(extractor._clean_number(n)) for n in numbers]
                                 df = pd.DataFrame(sorted(set(clean_numbers)), 
                                                 columns=["Numbers"])
-                                st.dataframe(df, use_container_width=True, height=300)
+                                st.dataframe(df, use_container_width=True, height=200)
                             except Exception as e:
                                 st.warning(f"Error displaying {category} data: {e}")
                         else:
