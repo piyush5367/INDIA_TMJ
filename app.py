@@ -66,7 +66,7 @@ def extract_corrigenda_numbers(text: str) -> List[str]:
 def extract_rc_numbers(text: str) -> List[str]:
     rc_numbers = []
     try:
-        ifз not isinstance(text, str):
+        if not isinstance(text, str):
             return []
         lines = text.split("\n")
         for line in lines:
