@@ -126,8 +126,7 @@ def save_to_excel(data_dict):
 
 # Streamlit app with optimizations
 def main():
-    # Center the title using Markdown and HTML
-    st.markdown("<h1 style='text-align: center;'>INDIA TMJ</h1>", unsafe_allow_html=True)
+    st.title("INDIA TMJ")  # Using Streamlit's built-in title function (no HTML for centering)
 
     # Initialize session state
     if "extracted_data" not in st.session_state:
