@@ -45,7 +45,6 @@ class TMJNumberExtractor:
         """Clean extracted number by removing non-digit characters"""
         if not isinstance(number, str):
             return ""
-        # Remove commas, spaces, and other non-digit characters
         return re.sub(r"[^\d]", "", number)
 
     def _validate_number(self, number: str) -> bool:
@@ -229,9 +228,8 @@ class TMJNumberExtractor:
                 for sheet_name, numbers in data_dict.items():
                     if numbers:
                         try:
-                            # Clean numbers by removing commas before saving to Excel
                             clean_numbers = [int(self._clean_number(n)) for n in numbers]
-                            df = pd.DataFrame(sorted(set(clean_numbers)), columns=["Numbers"])
+                            df = pd.DataFrame(sorted(set(clean_numbers)), columns=["Trade Mark Number"])
                             df.to_excel(writer, index=False, sheet_name=sheet_name[:31])
                         except Exception as e:
                             logging.error(f"Error writing {sheet_name} to Excel: {e}")
@@ -246,12 +244,38 @@ class TMJNumberExtractor:
 def main():
     """Streamlit application"""
     try:
-        st.set_page_config(page_title="Application Number Extractor")
-        st.title("INDIA TMJ")
+        # ================== UI ENHANCEMENTS ================== #
+        # 1. Custom Fonts
+        st.markdown("""
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Playfair+Display:wght@700&display=swap');
+        
+        html, body, [class*="css"] {
+            font-family: 'Roboto', sans-serif;
+        }
+        h1, h2, h3 {
+            font-family: 'Playfair Display', serif;
+            color: #2F4F4F !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # 3. Gradient Header
+        st.markdown("""
+        <style>
+        [data-testid="stHeader"] {
+            background: linear-gradient(90deg, #1E3A8A, #4B8BBE);
+            color: white;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # ================== MAIN APP ================== #
+        st.set_page_config(page_title="TMJ Number Extractor", layout="wide")
+        st.title("INDIA TMJ Number Extractor")
         
         # File upload
-        uploaded_file = st.file_uploader("Upload PDF", type=["pdf"], 
-                                       help="Upload Trade Marks Journal PDF")
+        uploaded_file = st.file_uploader("Upload Trade Marks Journal PDF", type=["pdf"])
         
         if uploaded_file is not None:
             st.write(f"Processing: **{uploaded_file.name}**")
@@ -259,7 +283,7 @@ def main():
             # Initialize extractor
             extractor = TMJNumberExtractor()
             
-            with st.spinner("Analyze your document..."):
+            with st.spinner("Extracting numbers from PDF..."):
                 extracted_data = extractor.process_pdf(uploaded_file)
                 excel_data = extractor.save_to_excel(extracted_data)
             
@@ -267,21 +291,16 @@ def main():
                 st.success("Extraction completed successfully!")
                 
                 # Display results in tabs
-                tabs = st.tabs(list(extracted_data.keys()))
+                tabs = st.tabs([f"📰 {k.replace('_', ' ').title()}" for k in extracted_data.keys()])
                 for tab, (category, numbers) in zip(tabs, extracted_data.items()):
                     with tab:
                         if numbers:
-                            st.write(f"Found {len(numbers)} {category} numbers")  
-                            try:
-                                # Display cleaned numbers without commas
-                                clean_numbers = [int(extractor._clean_number(n)) for n in numbers]
-                                df = pd.DataFrame(sorted(set(clean_numbers)), 
-                                                columns=["Numbers"])
-                                st.dataframe(df, use_container_width=True, height=200)
-                            except Exception as e:
-                                st.warning(f"Error displaying {category} data: {e}")
+                            st.write(f"Found {len(numbers)} {category.replace('_', ' ')} numbers")
+                            clean_numbers = [int(extractor._clean_number(n)) for n in numbers]
+                            df = pd.DataFrame(sorted(set(clean_numbers)), columns=["Trade Mark Number"])
+                            st.dataframe(df, height=400, use_container_width=True)
                         else:
-                            st.info(f"No {category} numbers found.")
+                            st.info(f"No {category.replace('_', ' ')} numbers found.")
                 
                 # Download button
                 if excel_data:
