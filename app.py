@@ -42,8 +42,8 @@ class TMJNumberExtractor:
         self.logger = logging.getLogger(__name__)
 
     def _clean_number(self, number: str) -> str:
-        """Remove commas and whitespace from numbers"""
-        return number.replace(',', '').strip()
+        """Remove commas from numbers while keeping original for display"""
+        return number.replace(',', '')
 
     def _validate_number(self, number: str) -> bool:
         """Validate extracted number meets criteria"""
@@ -65,7 +65,7 @@ class TMJNumberExtractor:
             
         try:
             matches = re.findall(pattern, text)
-            return [self._clean_number(m) for m in matches if self._validate_number(m)]
+            return [m for m in matches if self._validate_number(m)]
         except Exception as e:
             self.logger.error(f"Regex error with pattern {pattern}: {e}")
             return []
@@ -92,49 +92,41 @@ class TMJNumberExtractor:
             return []
 
         numbers = []
-        in_section = False
-        lines = text.split('\n')
+        found_corrigenda_section = False
+        lines = text.split("\n")
         
         for line in lines:
             line = line.strip()
-            upper_line = line.upper()
-            
-            if self.section_markers['corrigenda'].upper() in upper_line:
-                in_section = True
+            if self.section_markers['corrigenda'].upper() in line.upper():
+                found_corrigenda_section = True
                 continue
                 
-            if self.section_markers['registered'].upper() in upper_line:
+            if self.section_markers['registered'].upper() in line.upper():
                 break
                 
-            if in_section:
-                numbers.extend(self.extract_numbers(line, self.patterns['corrigenda']))
+            if found_corrigenda_section:
+                matches = re.findall(r'(\d{5,})\s*[ ]', line)
+                numbers.extend(matches)
                 
         return self._remove_duplicates(numbers)
 
     def extract_rc_numbers(self, text: str) -> List[str]:
-        """Extract RC numbers before renewal section - Original logic with comma handling"""
+        """Extract RC numbers before renewal section"""
         if not text:
             return []
 
         numbers = []
-        lines = text.split('\n')
+        lines = text.split("\n")
         
         for line in lines:
             line = line.strip()
             if self.section_markers['renewal'].upper() in line.upper():
                 break
                 
-            # Original RC extraction logic with comma handling
             columns = line.split()
-            if len(columns) == 5:
-                valid_numbers = []
-                for col in columns:
-                    clean_num = self._clean_number(col)
-                    if clean_num.isdigit() and len(clean_num) >= 5:
-                        valid_numbers.append(clean_num)
-                if len(valid_numbers) == 5:  # All 5 columns valid
-                    numbers.extend(valid_numbers)
-                    
+            if len(columns) == 5 and all(col.isdigit() for col in columns):
+                numbers.extend(columns)
+                
         return self._remove_duplicates(numbers)
 
     def extract_renewal_numbers(self, text: str) -> List[str]:
@@ -233,8 +225,8 @@ def save_to_excel(data_dict: Dict[str, List[str]]) -> Optional[bytes]:
             for sheet_name, numbers in data_dict.items():
                 if numbers:
                     try:
-                        # Convert to integers after cleaning
-                        clean_numbers = [int(n) for n in numbers if n.isdigit()]
+                        # Clean numbers by removing commas before saving to Excel
+                        clean_numbers = [int(self._clean_number(n)) for n in numbers]
                         df = pd.DataFrame(sorted(set(clean_numbers)), columns=["Numbers"])
                         df.to_excel(writer, index=False, sheet_name=sheet_name[:31])
                     except Exception as e:
@@ -277,8 +269,8 @@ def main():
                         if numbers:
                             st.write(f"Found {len(numbers)} {category} numbers")
                             try:
-                                # Display as integers
-                                clean_numbers = [int(n) for n in numbers if n.isdigit()]
+                                # Display cleaned numbers without commas
+                                clean_numbers = [int(extractor._clean_number(n)) for n in numbers]
                                 df = pd.DataFrame(sorted(set(clean_numbers)), 
                                                 columns=["Numbers"])
                                 st.dataframe(df, use_container_width=True, height=300)
