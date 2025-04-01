@@ -36,7 +36,7 @@ class TMJNumberExtractor:
         
         # Validation rules
         self.min_number_length = 5
-        self.max_number_length = none 
+        self.max_number_length = None 
         
         # Configure logging
         self.logger = logging.getLogger(__name__)
