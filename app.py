@@ -238,7 +238,7 @@ def save_to_excel(data_dict: Dict[str, List[str]]) -> Optional[bytes]:
 def main():
     """Streamlit application"""
     try:
-        st.set_page_config(page_title="INDIA TMJ Extractor", layout="wide")
+        st.set_page_config(page_title="INDIA TMJ Extractor" )
         
         # File upload
         uploaded_file = st.file_uploader("Upload PDF", type=["pdf"], 
