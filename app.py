@@ -41,13 +41,21 @@ class TMJNumberExtractor:
         # Configure logging
         self.logger = logging.getLogger(__name__)
 
+    def _clean_number(self, number: str) -> str:
+        """Clean extracted number by removing non-digit characters"""
+        if not isinstance(number, str):
+            return ""
+        # Remove commas, spaces, and other non-digit characters
+        return re.sub(r"[^\d]", "", number)
+
     def _validate_number(self, number: str) -> bool:
         """Validate extracted number meets criteria"""
         clean_num = self._clean_number(number)
-        if not isinstance(clean_num, str):
+        if not clean_num:
             return False
         return (clean_num.isdigit() and 
-                self.min_number_length <= len(clean_num) <= self.max_number_length)
+                len(clean_num) >= self.min_number_length and
+                (self.max_number_length is None or len(clean_num) <= self.max_number_length))
 
     def _remove_duplicates(self, numbers: List[str]) -> List[str]:
         """Remove duplicates while preserving order"""
@@ -213,33 +221,33 @@ class TMJNumberExtractor:
             
         return extracted_data
 
-def save_to_excel(data_dict: Dict[str, List[str]]) -> Optional[bytes]:
-    """Generate Excel file from extracted data"""
-    try:
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            for sheet_name, numbers in data_dict.items():
-                if numbers:
-                    try:
-                        # Clean numbers by removing commas before saving to Excel
-                        clean_numbers = [int(self._clean_number(n)) for n in numbers]
-                        df = pd.DataFrame(sorted(set(clean_numbers)), columns=["Numbers"])
-                        df.to_excel(writer, index=False, sheet_name=sheet_name[:31])
-                    except Exception as e:
-                        logging.error(f"Error writing {sheet_name} to Excel: {e}")
-                        continue
-        output.seek(0)
-        return output.getvalue()
-    except Exception as e:
-        st.error(f"Failed to create Excel file: {e}")
-        logging.error(f"Excel error: {e}")
-        return None
+    def save_to_excel(self, data_dict: Dict[str, List[str]]) -> Optional[bytes]:
+        """Generate Excel file from extracted data"""
+        try:
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                for sheet_name, numbers in data_dict.items():
+                    if numbers:
+                        try:
+                            # Clean numbers by removing commas before saving to Excel
+                            clean_numbers = [int(self._clean_number(n)) for n in numbers]
+                            df = pd.DataFrame(sorted(set(clean_numbers)), columns=["Numbers"])
+                            df.to_excel(writer, index=False, sheet_name=sheet_name[:31])
+                        except Exception as e:
+                            logging.error(f"Error writing {sheet_name} to Excel: {e}")
+                            continue
+            output.seek(0)
+            return output.getvalue()
+        except Exception as e:
+            st.error(f"Failed to create Excel file: {e}")
+            logging.error(f"Excel error: {e}")
+            return None
 
 def main():
     """Streamlit application"""
     try:
-        st.set_page_config(page_title="Application Number Extractor" )
-        st.title ("INDIA TMJ")
+        st.set_page_config(page_title="Application Number Extractor")
+        st.title("INDIA TMJ")
         
         # File upload
         uploaded_file = st.file_uploader("Upload PDF", type=["pdf"], 
@@ -253,7 +261,7 @@ def main():
             
             with st.spinner("Analyze your document..."):
                 extracted_data = extractor.process_pdf(uploaded_file)
-                excel_data = save_to_excel(extracted_data)
+                excel_data = extractor.save_to_excel(extracted_data)
             
             if any(extracted_data.values()):
                 st.success("Extraction completed successfully!")
