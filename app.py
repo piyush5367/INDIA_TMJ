@@ -18,13 +18,17 @@ def extract_numbers(text, pattern):
 def extract_advertisement_numbers(text):
     advertisement_numbers = []
     lines = text.split("\n")
+    
     for line in lines:
-        line = line.strip()
+        line = line.strip()  
+        
         if "CORRIGENDA" in line:
-            break
-        matches = re.findall(r' (\d{5,})\s+\d{2}/\d{2}/\d{4} ', line)
-        advertisement_numbers.extend(matches)
-    return advertisement_numbers
+            break  
+        
+               matches = re.findall(r' (\d{5,})\s+\d{2}/\d{2}/\d{4} ', line)
+        advertisement_numbers.extend(matches)  
+    
+    return advertisement_numbers  
 
 # Function to extract Corrigenda numbers
 def extract_corrigenda_numbers(text):
