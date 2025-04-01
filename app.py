@@ -20,13 +20,14 @@ def extract_advertisement_numbers(text):
     lines = text.split("\n")
     
     for line in lines:
-        line = line.strip()  
+        line = line.strip()  # Clean up the line
         
         if "CORRIGENDA" in line:
-            break  
+            break  # Stop if "CORRIGENDA" section is reached
         
-               matches = re.findall(r' (\d{5,})\s+\d{2}/\d{2}/\d{4} ', line)
-        advertisement_numbers.extend(matches)  
+        # Corrected regex extraction of advertisement numbers
+        matches = re.findall(r' (\d{5,})\s+\d{2}/\d{2}/\d{4} ', line)  
+        advertisement_numbers.extend(matches)  # Add found numbers to the list
     
     return advertisement_numbers  
 
