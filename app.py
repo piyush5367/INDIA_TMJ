@@ -16,10 +16,12 @@ SECTION_MARKERS = {
     "REGISTERED": "Following Trade Mark applications have been Registered"
 }
 
-# Number extraction functions
+# Number extraction functions (unchanged logic)
 def extract_numbers(text: str, pattern: str) -> List[str]:
     try:
-        return re.findall(pattern, text) if isinstance(text, str) else []
+        if not isinstance(text, str):
+            return []
+        return re.findall(pattern, text)
     except Exception as e:
         logging.error(f"Regex error: {e}")
         return []
@@ -27,6 +29,8 @@ def extract_numbers(text: str, pattern: str) -> List[str]:
 def extract_advertisement_numbers(text: str) -> List[str]:
     advertisement_numbers = []
     try:
+        if not isinstance(text, str):
+            return []
         lines = text.split("\n")
         for line in lines:
             line = line.strip()
@@ -42,6 +46,8 @@ def extract_corrigenda_numbers(text: str) -> List[str]:
     corrigenda_numbers = []
     found_corrigenda_section = False
     try:
+        if not isinstance(text, str):
+            return []
         lines = text.split("\n")
         for line in lines:
             line = line.strip()
@@ -58,28 +64,39 @@ def extract_corrigenda_numbers(text: str) -> List[str]:
     return corrigenda_numbers
 
 def extract_rc_numbers(text: str) -> List[str]:
-    return extract_numbers_from_section(text, SECTION_MARKERS["RENEWAL"], r'\b\d{5,}\b')
-
-def extract_renewal_numbers(text: str) -> List[str]:
-    return extract_numbers_from_section(text, SECTION_MARKERS["RENEWAL"], r'\b(\d{5,})\b', start_after_section=True)
-
-def extract_numbers_from_section(text: str, section_marker: str, pattern: str, start_after_section=False) -> List[str]:
-    numbers = []
-    found_section = False
+    rc_numbers = []
     try:
+        if not isinstance(text, str):
+            return []
         lines = text.split("\n")
         for line in lines:
             line = line.strip()
-            if section_marker in line:
-                found_section = True
-                if not start_after_section:
-                    continue
-            if found_section:
-                matches = extract_numbers(line, pattern)
-                numbers.extend(matches)
+            if SECTION_MARKERS["RENEWAL"] in line:
+                break
+            matches = extract_numbers(line, r'\b\d{5,}\b')
+            rc_numbers.extend(matches)
     except Exception as e:
-        logging.error(f"Extraction error for section {section_marker}: {e}")
-    return numbers
+        logging.error(f"RC extraction error: {e}")
+    return rc_numbers
+
+def extract_renewal_numbers(text: str) -> List[str]:
+    renewal_numbers = []
+    found_renewal_section = False
+    try:
+        if not isinstance(text, str):
+            return []
+        lines = text.split("\n")
+        for line in lines:
+            line = line.strip()
+            if SECTION_MARKERS["RENEWAL"] in line:
+                found_renewal_section = True
+                continue
+            if found_renewal_section:
+                matches = extract_numbers(line, r'\b(\d{5,})\b')
+                renewal_numbers.extend(matches)
+    except Exception as e:
+        logging.error(f"Renewal extraction error: {e}")
+    return renewal_numbers
 
 # PDF extraction with enhanced stability
 def extract_numbers_from_pdf(pdf_file) -> Dict[str, List[str]]:
@@ -90,6 +107,7 @@ def extract_numbers_from_pdf(pdf_file) -> Dict[str, List[str]]:
         return extracted_data
 
     try:
+        # Ensure file is readable
         pdf_file.seek(0)
         with pdfplumber.open(pdf_file) as pdf:
             total_pages = len(pdf.pages)
@@ -100,7 +118,9 @@ def extract_numbers_from_pdf(pdf_file) -> Dict[str, List[str]]:
             progress_bar = st.progress(0)
             for i, page in enumerate(pdf.pages):
                 try:
-                    text = page.extract_text() or ""
+                    text = page.extract_text()
+                    if text is None:  # Handle cases where extract_text returns None
+                        text = ""
                     extracted_data["Advertisement"].extend(extract_advertisement_numbers(text))
                     extracted_data["Corrigenda"].extend(extract_corrigenda_numbers(text))
                     extracted_data["RC"].extend(extract_rc_numbers(text))
@@ -122,12 +142,18 @@ def save_to_excel(data_dict: Dict[str, List[str]]) -> bytes:
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             for sheet_name, numbers in data_dict.items():
                 if numbers:
-                    valid_numbers = [num for num in numbers if num.isdigit()]
-                    if valid_numbers:
-                        df = pd.DataFrame(sorted(set(map(int, valid_numbers))), columns=["Numbers"])
-                        df.to_excel(writer, index=False, sheet_name=sheet_name[:31])
+                    try:
+                        # Filter and convert numbers safely
+                        valid_numbers = [num for num in numbers if isinstance(num, str) and num.isdigit()]
+                        if valid_numbers:
+                            df = pd.DataFrame(sorted(set(map(int, valid_numbers))), columns=["Numbers"])
+                            df.to_excel(writer, index=False, sheet_name=sheet_name[:31])
+                    except Exception as e:
+                        logging.error(f"Error writing {sheet_name} to Excel: {e}")
+                        continue
         output.seek(0)
-        return output.getvalue() if any(data_dict.values()) else None
+        excel_data = output.getvalue()
+        return excel_data if excel_data and any(data_dict.values()) else None
     except Exception as e:
         st.error(f"Failed to create Excel file: {e}")
         logging.error(f"Excel error: {e}")
@@ -143,7 +169,7 @@ def main():
         with st.sidebar:
             uploaded_file = st.file_uploader("Choose a PDF file", type=["pdf"], help="Upload a PDF to extract numbers")
 
-        if uploaded_file:
+        if uploaded_file is not None:
             st.write(f"Processing: **{uploaded_file.name}**")
             with st.spinner("Extracting numbers from PDF..."):
                 extracted_data = extract_numbers_from_pdf(uploaded_file)
@@ -151,19 +177,22 @@ def main():
 
             if any(extracted_data.values()):
                 st.success("Extraction completed successfully!")
-
+                
                 # Display results in tabs
                 tabs = st.tabs(extracted_data.keys())
                 for tab, (category, numbers) in zip(tabs, extracted_data.items()):
                     with tab:
                         if numbers:
                             st.write(f"Found {len(numbers)} numbers")
-                            valid_numbers = [num for num in numbers if num.isdigit()]
-                            if valid_numbers:
-                                df = pd.DataFrame(sorted(set(map(int, valid_numbers))), columns=["Numbers"])
-                                st.dataframe(df, use_container_width=True, height=300)
-                            else:
-                                st.info(f"No valid {category} numbers found.")
+                            try:
+                                valid_numbers = [num for num in numbers if isinstance(num, str) and num.isdigit()]
+                                if valid_numbers:
+                                    df = pd.DataFrame(sorted(set(map(int, valid_numbers))), columns=["Numbers"])
+                                    st.dataframe(df, use_container_width=True, height=300)
+                                else:
+                                    st.info(f"No valid {category} numbers found.")
+                            except Exception as e:
+                                st.warning(f"Error displaying {category} data: {e}")
                         else:
                             st.info(f"No {category} numbers found.")
 
