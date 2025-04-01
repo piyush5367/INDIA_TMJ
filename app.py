@@ -19,14 +19,18 @@ def extract_advertisement_numbers(text):
     advertisement_numbers = []
     lines = text.split("\n")
     
+    # Loop through each line to find advertisement numbers
     for line in lines:
         line = line.strip()  # Clean up the line
         
         if "CORRIGENDA" in line:
             break  # Stop if "CORRIGENDA" section is reached
         
-        # Corrected regex extraction of advertisement numbers
-        matches = re.findall(r' (\d{5,})\s+\d{2}/\d{2}/\d{4} ', line)  
+        # Corrected regex to capture advertisement numbers followed by a date (dd/mm/yyyy)
+        matches = re.findall(r'(\d{5,})\s+\d{2}/\d{2}/\d{4}', line)
+        
+        if matches:
+            logging.info(f"Found advertisement numbers: {matches} in line: {line}")  # Log the matches
         advertisement_numbers.extend(matches)  # Add found numbers to the list
     
     return advertisement_numbers  
@@ -91,7 +95,12 @@ def extract_numbers_from_pdf(pdf_file):
                 end = min(start + chunk_size, total_pages)
                 for i in range(start, end):
                     page = pdf.pages[i]
-                    text = page.extract_text() or ""  # Handle None case
+                    text = page.extract_text() or ""  # Ensure text extraction is not None
+                    
+                    # Debugging: Show a preview of the extracted text to check if it's correct
+                    st.write(f"--- Text from page {i+1} ---")
+                    st.text(text[:500])  # Preview first 500 characters of extracted text
+                    
                     extracted_data["Advertisement"].extend(extract_advertisement_numbers(text))
                     extracted_data["Corrigenda"].extend(extract_corrigenda_numbers(text))
                     extracted_data["RC"].extend(extract_rc_numbers(text))
@@ -138,12 +147,12 @@ def main():
         file_name = uploaded_file.name
         st.write(f"Selected file: {file_name}")
 
-        # Process button
-        if st.button("Extract Numbers") or (st.session_state.file_name != file_name):
-            st.session_state.file_name = file_name
-            with st.spinner("Processing PDF..."):
-                st.session_state.extracted_data = extract_numbers_from_pdf(uploaded_file)
-                st.session_state.excel_data = save_to_excel(st.session_state.extracted_data)
+        # Extract numbers from PDF and display them
+        extracted_data = extract_numbers_from_pdf(uploaded_file)
+        
+        # Save to Excel
+        st.session_state.extracted_data = extracted_data
+        st.session_state.excel_data = save_to_excel(extracted_data)
 
         # Display results if available
         if st.session_state.extracted_data is not None:
@@ -168,6 +177,6 @@ def main():
                 )
             else:
                 st.warning("No numbers found matching the specified patterns.")
-
+                
 if __name__ == "__main__":
     main()
