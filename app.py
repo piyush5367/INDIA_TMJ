@@ -41,12 +41,17 @@ class TMJNumberExtractor:
         # Configure logging
         self.logger = logging.getLogger(__name__)
 
+    def _clean_number(self, number: str) -> str:
+        """Remove commas and whitespace from numbers"""
+        return number.replace(',', '').strip()
+
     def _validate_number(self, number: str) -> bool:
         """Validate extracted number meets criteria"""
-        if not isinstance(number, str):
+        clean_num = self._clean_number(number)
+        if not isinstance(clean_num, str):
             return False
-        return (number.isdigit() and 
-                self.min_number_length <= len(number) <= self.max_number_length)
+        return (clean_num.isdigit() and 
+                self.min_number_length <= len(clean_num) <= self.max_number_length)
 
     def _remove_duplicates(self, numbers: List[str]) -> List[str]:
         """Remove duplicates while preserving order"""
@@ -60,7 +65,7 @@ class TMJNumberExtractor:
             
         try:
             matches = re.findall(pattern, text)
-            return [m for m in matches if self._validate_number(m)]
+            return [self._clean_number(m) for m in matches if self._validate_number(m)]
         except Exception as e:
             self.logger.error(f"Regex error with pattern {pattern}: {e}")
             return []
@@ -107,7 +112,7 @@ class TMJNumberExtractor:
         return self._remove_duplicates(numbers)
 
     def extract_rc_numbers(self, text: str) -> List[str]:
-        """Extract RC numbers before renewal section"""
+        """Extract RC numbers before renewal section - Original logic with comma handling"""
         if not text:
             return []
 
@@ -119,9 +124,16 @@ class TMJNumberExtractor:
             if self.section_markers['renewal'].upper() in line.upper():
                 break
                 
-            for col in line.split():
-                if self._validate_number(col):
-                    numbers.append(col)
+            # Original RC extraction logic with comma handling
+            columns = line.split()
+            if len(columns) == 5:
+                valid_numbers = []
+                for col in columns:
+                    clean_num = self._clean_number(col)
+                    if clean_num.isdigit() and len(clean_num) >= 5:
+                        valid_numbers.append(clean_num)
+                if len(valid_numbers) == 5:  # All 5 columns valid
+                    numbers.extend(valid_numbers)
                     
         return self._remove_duplicates(numbers)
 
@@ -221,7 +233,9 @@ def save_to_excel(data_dict: Dict[str, List[str]]) -> Optional[bytes]:
             for sheet_name, numbers in data_dict.items():
                 if numbers:
                     try:
-                        df = pd.DataFrame(sorted(set(map(int, numbers))), columns=["Numbers"])
+                        # Convert to integers after cleaning
+                        clean_numbers = [int(n) for n in numbers if n.isdigit()]
+                        df = pd.DataFrame(sorted(set(clean_numbers)), columns=["Numbers"])
                         df.to_excel(writer, index=False, sheet_name=sheet_name[:31])
                     except Exception as e:
                         logging.error(f"Error writing {sheet_name} to Excel: {e}")
@@ -263,7 +277,9 @@ def main():
                         if numbers:
                             st.write(f"Found {len(numbers)} {category} numbers")
                             try:
-                                df = pd.DataFrame(sorted(set(map(int, numbers))), 
+                                # Display as integers
+                                clean_numbers = [int(n) for n in numbers if n.isdigit()]
+                                df = pd.DataFrame(sorted(set(clean_numbers)), 
                                                 columns=["Numbers"])
                                 st.dataframe(df, use_container_width=True, height=300)
                             except Exception as e:
