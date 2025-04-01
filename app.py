@@ -121,8 +121,7 @@ def save_to_excel(data_dict):
 
 # Streamlit app with optimizations
 def main():
-    st.title("PDF Number Extractor")
-    st.write("Upload a PDF to extract Advertisement, Corrigenda, RC, and Renewal numbers.")
+    st.title("INDIA TMJ")
 
     # Initialize session state
     if "extracted_data" not in st.session_state:
