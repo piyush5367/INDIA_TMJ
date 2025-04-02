@@ -1,6 +1,29 @@
-streamlit==1.28.0
-pdfplumber==0.10.3
-pandas==2.1.1
-openpyxl==3.1.2
-python-docx==0.8.11
-PyPDF2==3.0.1
+# Core PDF Processing
+pdfplumber==0.10.3  # PDF text extraction
+pypdfium2==4.30.1   # Alternative PDF renderer (faster for some files)
+pdfminer-six==20221105  # Fallback parser
+
+# Data Handling
+pandas==2.1.1        # Data manipulation
+openpyxl==3.1.2      # Excel export support
+numpy==1.26.4        # Pandas dependency
+
+# Streamlit UI
+streamlit==1.28.0    # Web interface
+altair==5.5.0        # Optional for future charts
+
+# System Monitoring
+psutil==5.9.8        # Memory management
+watchdog==6.0.0      # File system monitoring
+
+# Text Processing
+lxml==5.3.1          # Faster XML/HTML handling
+python-docx==0.8.11  # Optional Word export
+
+# Utilities
+tenacity==8.5.0      # Retry decorators
+rich==13.9.4         # Enhanced logging
+tzdata==2025.2       # Timezone support
+
+# Security
+cryptography==44.0.2  # Secure file handling
