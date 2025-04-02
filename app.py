@@ -301,4 +301,4 @@ def main():
             st.warning("No numbers extracted from the PDF.")
 
 if __name__ == "__main__":
-    main()
+    main() 
