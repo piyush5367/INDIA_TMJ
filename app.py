@@ -7,8 +7,14 @@ from io import BytesIO
 from typing import Dict, List, Optional
 import gc
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
+import os
+import sys
 
-# Initialize session state properly at the start
+# Configure environment before any imports
+os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
+os.environ["PYTHONWARNINGS"] = "ignore::UserWarning"
+
+# Initialize session state properly
 if 'initialized' not in st.session_state:
     st.session_state.initialized = True
     st.session_state.progress = 0
@@ -17,15 +23,15 @@ if 'initialized' not in st.session_state:
     st.session_state.extracted_data = None
     st.session_state.processing = False
 
-# Configure logging (original)
+# Configure logging
 logging.basicConfig(filename="pdf_extraction.log", level=logging.INFO, 
                    format="%(asctime)s - %(message)s")
 
 class TMJNumberExtractor:
-    """Complete extractor with ALL original logic + optimizations"""
+    """Enhanced extractor with all original logic plus optimizations"""
     
     def __init__(self):
-        # Original section markers now as compiled regex
+        # Original section markers as compiled regex
         self.section_markers = {
             'corrigenda': re.compile(r'CORRIGENDA', re.IGNORECASE),
             'renewal': re.compile(r'FOLLOWING TRADE MARKS REGISTRATION RENEWED', re.IGNORECASE),
@@ -49,19 +55,21 @@ class TMJNumberExtractor:
         self.min_number_length = 5
         self.max_number_length = None
         
-        # Optimization parameters (new additions)
-        self.batch_size = 5  # Optimal batch size for processing
+        # Optimization parameters
+        self.batch_size = 3  # Reduced for better memory handling
         self.timeout_seconds = 30  # Timeout per batch
         self.logger = logging.getLogger(__name__)
 
-    # Original cleaning function (unchanged)
+    # Original cleaning function
     def _clean_number(self, number: str) -> str:
+        """Original implementation preserved"""
         if not isinstance(number, str):
             return ""
         return re.sub(r"[^\d]", "", number)
 
-    # Original validation function (unchanged)
+    # Original validation function
     def _validate_number(self, number: str) -> bool:
+        """Original implementation preserved"""
         clean_num = self._clean_number(number)
         if not clean_num:
             return False
@@ -69,79 +77,67 @@ class TMJNumberExtractor:
                 len(clean_num) >= self.min_number_length and
                 (self.max_number_length is None or len(clean_num) <= self.max_number_length))
 
-    # Original duplicate removal (unchanged)
+    # Original duplicate removal
     def _remove_duplicates(self, numbers: List[str]) -> List[str]:
+        """Original implementation preserved"""
         seen = set()
         seen_add = seen.add
         return [n for n in numbers if not (n in seen or seen_add(n))]
 
-    # Original extraction logic (unchanged interface)
+    # Original extraction logic
     def extract_numbers(self, text: str, pattern: re.Pattern) -> List[str]:
+        """Original implementation preserved"""
         if not text or not isinstance(text, str):
             return []
         matches = pattern.findall(text)
         return [m for m in matches if self._validate_number(m)]
 
-    # Original section processors (maintained exactly as you wrote them)
+    # All original section processors preserved exactly
     def extract_advertisement_numbers(self, text: str) -> List[str]:
-        if not text:
-            return []
-
+        """Original implementation"""
+        if not text: return []
         numbers = []
         lines = text.split('\n')
-        
         for line in lines:
             line = line.strip()
-            if self.section_markers['corrigenda'].search(line):
-                break
+            if self.section_markers['corrigenda'].search(line): break
             numbers.extend(self.extract_numbers(line, self.patterns['advertisement']))
-            
         return self._remove_duplicates(numbers)
 
     def extract_corrigenda_numbers(self, text: str) -> List[str]:
-        if not text:
-            return []
-
+        """Original implementation"""
+        if not text: return []
         numbers = []
         found_corrigenda = False
         lines = text.split('\n')
-        
         for line in lines:
             line = line.strip()
             if self.section_markers['corrigenda'].search(line):
                 found_corrigenda = True
                 continue
-            if self.section_markers['registered'].search(line):
-                break
+            if self.section_markers['registered'].search(line): break
             if found_corrigenda:
                 numbers.extend(self.extract_numbers(line, self.patterns['corrigenda']))
-                
         return self._remove_duplicates(numbers)
 
     def extract_rc_numbers(self, text: str) -> List[str]:
-        if not text:
-            return []
-
+        """Original implementation"""
+        if not text: return []
         numbers = []
         lines = text.split('\n')
-        
         for line in lines:
             line = line.strip()
-            if self.section_markers['renewal'].search(line):
-                break
+            if self.section_markers['renewal'].search(line): break
             if len(cols := line.split()) == 5 and all(c.isdigit() for c in cols):
                 numbers.extend(cols)
-                
         return self._remove_duplicates(numbers)
 
     def extract_renewal_numbers(self, text: str) -> List[str]:
-        if not text:
-            return []
-
+        """Original implementation"""
+        if not text: return []
         numbers = []
         in_section = False
         lines = text.split('\n')
-        
         for line in lines:
             line = line.strip()
             if self.section_markers['renewal'].search(line):
@@ -150,17 +146,14 @@ class TMJNumberExtractor:
             if in_section:
                 for pattern in self.patterns['renewal']:
                     numbers.extend(self.extract_numbers(line, pattern))
-                    
         return self._remove_duplicates(numbers)
 
     def extract_pr_section_numbers(self, text: str) -> List[str]:
-        if not text:
-            return []
-
+        """Original implementation"""
+        if not text: return []
         numbers = []
         in_section = False
         lines = text.split('\n')
-        
         for line in lines:
             line = line.strip()
             if self.section_markers['pr_section'].search(line):
@@ -168,29 +161,27 @@ class TMJNumberExtractor:
                 continue
             if in_section:
                 numbers.extend(self.extract_numbers(line, self.patterns['pr_section']))
-                
         return self._remove_duplicates(numbers)
 
     def process_page(self, page) -> Dict[str, List[str]]:
-        """Process single page with original exact logic"""
-        text = page.extract_text() or ""
-        return {
-            'advertisement': self.extract_advertisement_numbers(text),
-            'corrigenda': self.extract_corrigenda_numbers(text),
-            'rc': self.extract_rc_numbers(text),
-            'renewal': self.extract_renewal_numbers(text),
-            'pr_section': self.extract_pr_section_numbers(text)
-        }
+        """Process single page with error handling"""
+        try:
+            text = page.extract_text() or ""
+            return {
+                'advertisement': self.extract_advertisement_numbers(text),
+                'corrigenda': self.extract_corrigenda_numbers(text),
+                'rc': self.extract_rc_numbers(text),
+                'renewal': self.extract_renewal_numbers(text),
+                'pr_section': self.extract_pr_section_numbers(text)
+            }
+        except Exception as e:
+            self.logger.error(f"Page processing error: {str(e)}")
+            return {k: [] for k in self.section_markers}
 
     def process_pdf(self, pdf_file) -> Dict[str, List[str]]:
-        """Optimized processing with ALL original logic preserved"""
-        results = {
-            'advertisement': [],
-            'corrigenda': [],
-            'rc': [],
-            'renewal': [],
-            'pr_section': []
-        }
+        """Optimized PDF processing with timeout and memory management"""
+        results = {k: [] for k in self.section_markers}
+        results['advertisement'] = []
         
         try:
             with pdfplumber.open(pdf_file) as pdf:
@@ -224,10 +215,11 @@ class TMJNumberExtractor:
                             st.session_state.current_page = min((i + 1) * self.batch_size, st.session_state.total_pages)
                             status_text.text(f"Processed {st.session_state.current_page}/{st.session_state.total_pages} pages ({(progress*100):.1f}%)")
                             
-                            # Memory management (new)
+                            # Memory management
                             del batch_results
                             if i % 5 == 0:  # Clear cache periodically
-                                pdf.flush_cache()
+                                if hasattr(pdf, 'flush_cache'):
+                                    pdf.flush_cache()
                                 gc.collect()
                                 
                         except TimeoutError:
@@ -240,13 +232,11 @@ class TMJNumberExtractor:
         except Exception as e:
             self.logger.error(f"PDF processing failed: {str(e)}")
             st.error(f"Error processing PDF: {str(e)}")
-            return results
-
-        # Final deduplication
+        
         return {k: self._remove_duplicates(v) for k, v in results.items()}
 
-    # Original Excel export (unchanged)
     def save_to_excel(self, data_dict: Dict[str, List[str]]) -> Optional[bytes]:
+        """Original Excel export preserved"""
         output = BytesIO()
         try:
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
@@ -264,11 +254,11 @@ class TMJNumberExtractor:
             st.error(f"Excel generation error: {str(e)}")
             return None
 
-# Your original UI with ALL enhancements preserved
 def main():
+    """Original UI with all enhancements preserved"""
     st.set_page_config(page_title="TMJ Extractor", layout="wide")
     
-    # Your original enhanced CSS
+    # Your original CSS
     st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Zen+Antique+Soft&display=swap');
@@ -347,11 +337,11 @@ def main():
         unsafe_allow_html=True
     )
 
-    # Original file uploader with visible text
+    # Original file uploader
     uploaded_file = st.file_uploader(
         "Upload Trade Marks Journal PDF", 
         type=["pdf"],
-        help="Upload large PDF files (up to 200MB). Processing may take several minutes for very large files."
+        help="Upload PDF files (up to 200MB). Processing may take time for large files."
     )
     
     if uploaded_file is not None and not st.session_state.processing:
