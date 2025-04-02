@@ -1,23 +1,30 @@
-# Core Requirements
-streamlit==1.29.0  # Pinned to stable version
-pdfplumber==0.10.3  # Stable PDF processing
-pandas==2.1.4  # Data processing
+# Core Application Dependencies
+streamlit==1.29.0  # Stable version without escape sequence warnings
+pdfplumber==0.10.3  # Proven working version with pdfminer.six
+pandas==2.1.4  # Stable data processing
 openpyxl==3.1.2  # Excel export
 python-docx==1.1.0  # Document processing
 
-# Supporting Libraries
+# PDF Processing Stack
+pdfminer.six==20221105  # Specific working version
 Pillow==10.1.0  # Image processing
-numpy==1.26.2  # Numerical operations
-pdfminer.six==20221105  # PDF parsing
 pycryptodome==3.19.0  # Encryption support
 
-# Performance & Utilities
-tqdm==4.66.1  # Progress bars
-concurrent-log-handler==0.9.24  # Thread-safe logging
+# Supporting Libraries
+numpy==1.26.2  # Numerical operations
 protobuf==4.25.6  # Protocol buffers
+tqdm==4.66.1  # Progress bars
+click==8.1.8  # Command line interface
 
-# Version Pinning for Stability
-click==8.1.8
-typing-extensions==4.8.0
-python-dateutil==2.9.0.post0
-pytz==2025.2
+# Runtime Dependencies
+typing-extensions==4.8.0  # Type hints support
+python-dateutil==2.9.0.post0  # Date handling
+pytz==2025.2  # Timezone support
+six==1.17.0  # Compatibility
+
+# Memory Management
+psutil==5.9.8  # System monitoring
+gc-collect==0.1.0  # Garbage collection control
+
+# Logging
+concurrent-log-handler==0.9.24  # Thread-safe logging
