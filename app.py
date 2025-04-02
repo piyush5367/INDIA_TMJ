@@ -215,7 +215,7 @@ class TMJNumberExtractor:
                     df.to_excel(writer, index=False, sheet_name=sheet_name[:31])
         output.seek(0)
         return output.getvalue()
-      
+
 def main():
     """Streamlit application"""
     st.set_page_config(page_title="Number Extractor")
@@ -257,7 +257,7 @@ def main():
     )
 
     # Display the title
-    st.markdown('<p class="custom-title">INDIA TMJ</p>', unsafe_allow_html=True)True)
+    st.markdown('<p class="custom-title">INDIA TMJ</p>', unsafe_allow_html=True)
 
     # File upload
     uploaded_file = st.file_uploader("Upload PDF", type=["pdf"], 
