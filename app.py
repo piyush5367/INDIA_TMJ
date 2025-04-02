@@ -6,13 +6,16 @@ import logging
 from io import BytesIO
 from typing import Dict, List, Optional
 import gc
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
-# Initialize session state properly at the very beginning
-if not hasattr(st.session_state, 'initialized'):
+# Initialize session state properly at the start
+if 'initialized' not in st.session_state:
     st.session_state.initialized = True
     st.session_state.progress = 0
+    st.session_state.current_page = 0
+    st.session_state.total_pages = 0
     st.session_state.extracted_data = None
+    st.session_state.processing = False
 
 # Configure logging (original)
 logging.basicConfig(filename="pdf_extraction.log", level=logging.INFO, 
@@ -22,7 +25,7 @@ class TMJNumberExtractor:
     """Complete extractor with ALL original logic + optimizations"""
     
     def __init__(self):
-        # Original section markers (now compiled for speed)
+        # Original section markers now as compiled regex
         self.section_markers = {
             'corrigenda': re.compile(r'CORRIGENDA', re.IGNORECASE),
             'renewal': re.compile(r'FOLLOWING TRADE MARKS REGISTRATION RENEWED', re.IGNORECASE),
@@ -46,8 +49,9 @@ class TMJNumberExtractor:
         self.min_number_length = 5
         self.max_number_length = None
         
-        # Batch size for parallel processing
-        self.batch_size = 5  # Optimal for most systems
+        # Optimization parameters (new additions)
+        self.batch_size = 5  # Optimal batch size for processing
+        self.timeout_seconds = 30  # Timeout per batch
         self.logger = logging.getLogger(__name__)
 
     # Original cleaning function (unchanged)
@@ -78,7 +82,7 @@ class TMJNumberExtractor:
         matches = pattern.findall(text)
         return [m for m in matches if self._validate_number(m)]
 
-    # Original section processors (maintained exactly)
+    # Original section processors (maintained exactly as you wrote them)
     def extract_advertisement_numbers(self, text: str) -> List[str]:
         if not text:
             return []
@@ -190,17 +194,17 @@ class TMJNumberExtractor:
         
         try:
             with pdfplumber.open(pdf_file) as pdf:
-                total_pages = len(pdf.pages)
-                if not total_pages:
+                st.session_state.total_pages = len(pdf.pages)
+                if not st.session_state.total_pages:
                     return results
-                
+
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 
-                # Process in batches
+                # Process in batches with timeout
                 with ThreadPoolExecutor() as executor:
                     futures = []
-                    for i in range(0, total_pages, self.batch_size):
+                    for i in range(0, st.session_state.total_pages, self.batch_size):
                         batch = pdf.pages[i:i + self.batch_size]
                         futures.append(executor.submit(
                             lambda pages: [self.process_page(p) for p in pages], 
@@ -208,31 +212,38 @@ class TMJNumberExtractor:
                         ))
                     
                     for i, future in enumerate(futures):
-                        batch_results = future.result()
-                        for result in batch_results:
-                            for key in results:
-                                results[key].extend(result[key])
-                        
-                        # Update progress
-                        progress = min((i + 1) * self.batch_size / total_pages, 1.0)
-                        progress_bar.progress(progress)
-                        current_page = min((i + 1) * self.batch_size, total_pages)
-                        status_text.text(f"Processed {current_page}/{total_pages} pages ({(progress*100):.1f}%)")
-                        
-                        # Manual garbage collection
-                        del batch_results
-                        gc.collect()
+                        try:
+                            batch_results = future.result(timeout=self.timeout_seconds)
+                            for result in batch_results:
+                                for key in results:
+                                    results[key].extend(result[key])
+                            
+                            # Update progress
+                            progress = min((i + 1) * self.batch_size / st.session_state.total_pages, 1.0)
+                            progress_bar.progress(progress)
+                            st.session_state.current_page = min((i + 1) * self.batch_size, st.session_state.total_pages)
+                            status_text.text(f"Processed {st.session_state.current_page}/{st.session_state.total_pages} pages ({(progress*100):.1f}%)")
+                            
+                            # Memory management (new)
+                            del batch_results
+                            if i % 5 == 0:  # Clear cache periodically
+                                pdf.flush_cache()
+                                gc.collect()
+                                
+                        except TimeoutError:
+                            self.logger.warning(f"Batch {i} timed out after {self.timeout_seconds} seconds")
+                            continue
                 
                 progress_bar.empty()
                 status_text.empty()
                 
-                # Final deduplication
-                return {k: self._remove_duplicates(v) for k, v in results.items()}
-                
         except Exception as e:
-            self.logger.error(f"Processing failed: {str(e)}")
-            st.error(f"Error: {str(e)}")
+            self.logger.error(f"PDF processing failed: {str(e)}")
+            st.error(f"Error processing PDF: {str(e)}")
             return results
+
+        # Final deduplication
+        return {k: self._remove_duplicates(v) for k, v in results.items()}
 
     # Original Excel export (unchanged)
     def save_to_excel(self, data_dict: Dict[str, List[str]]) -> Optional[bytes]:
@@ -253,7 +264,7 @@ class TMJNumberExtractor:
             st.error(f"Excel generation error: {str(e)}")
             return None
 
-# Your original UI with ALL enhancements
+# Your original UI with ALL enhancements preserved
 def main():
     st.set_page_config(page_title="TMJ Extractor", layout="wide")
     
@@ -343,39 +354,45 @@ def main():
         help="Upload large PDF files (up to 200MB). Processing may take several minutes for very large files."
     )
     
-    if uploaded_file is not None:
-        extractor = TMJNumberExtractor()
-        
-        with st.spinner("Analyzing document... This may take several minutes for large files"):
-            extracted_data = extractor.process_pdf(uploaded_file)
-            st.session_state.extracted_data = extracted_data
+    if uploaded_file is not None and not st.session_state.processing:
+        if st.button("Process PDF"):
+            st.session_state.processing = True
+            try:
+                with st.spinner("Analyzing document..."):
+                    extractor = TMJNumberExtractor()
+                    st.session_state.extracted_data = extractor.process_pdf(uploaded_file)
+            finally:
+                st.session_state.processing = False
+            st.experimental_rerun()
+    
+    if st.session_state.extracted_data:
+        data = st.session_state.extracted_data
+        if any(data.values()):
+            st.success("Extraction completed successfully!")
             
-            if extracted_data and any(extracted_data.values()):
-                st.success("Extraction completed successfully!")
-                
-                # Original tabs display
-                tabs = st.tabs(list(extracted_data.keys()))
-                for tab, (category, numbers) in zip(tabs, extracted_data.items()):
-                    with tab:
-                        if numbers:
-                            st.write(f"Found {len(numbers):,} {category} numbers")  
-                            clean_numbers = [int(extractor._clean_number(n)) for n in numbers]
-                            df = pd.DataFrame(sorted(set(clean_numbers)), columns=["Numbers"])
-                            st.dataframe(df, use_container_width=True, height=400)
-                        else:
-                            st.info(f"No {category} numbers found.")
-                
-                # Original download button
-                if excel_data := extractor.save_to_excel(extracted_data):
-                    excel_size = len(excel_data) / (1024 * 1024)
-                    st.download_button(
-                        label=f"📥 Download Excel File ({excel_size:.2f} MB)",
-                        data=excel_data,
-                        file_name=f"tmj_numbers_{uploaded_file.name.split('.')[0]}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-            else:
-                st.warning("No numbers extracted from the PDF. The file may not contain recognizable patterns.")
+            # Original tabs display
+            tabs = st.tabs(list(data.keys()))
+            for tab, (category, numbers) in zip(tabs, data.items()):
+                with tab:
+                    if numbers:
+                        st.write(f"Found {len(numbers):,} {category} numbers")  
+                        clean_numbers = [int(extractor._clean_number(n)) for n in numbers]
+                        df = pd.DataFrame(sorted(set(clean_numbers)), columns=["Numbers"])
+                        st.dataframe(df, use_container_width=True, height=400)
+                    else:
+                        st.info(f"No {category} numbers found.")
+            
+            # Original download button
+            if excel_data := extractor.save_to_excel(data):
+                excel_size = len(excel_data) / (1024 * 1024)
+                st.download_button(
+                    label=f"📥 Download Excel File ({excel_size:.2f} MB)",
+                    data=excel_data,
+                    file_name=f"tmj_numbers_{uploaded_file.name.split('.')[0]}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+        else:
+            st.warning("No numbers extracted from the PDF. The file may not contain recognizable patterns.")
 
 if __name__ == "__main__":
     gc.collect()
