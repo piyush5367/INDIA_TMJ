@@ -228,11 +228,11 @@ def main():
 
         /* Set black background for the entire app */
         body {
-            background-color: #000000;
+            background-color: #00008B;
             color: #FFFFFF;
         }
         .stApp {
-            background-color: #000000;
+            background-color: #00008B;
             color: #FFFFFF;
         }
 
