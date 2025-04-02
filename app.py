@@ -54,7 +54,7 @@ class TMJNumberExtractor:
             return False
         return (clean_num.isdigit() and 
                 len(clean_num) >= self.min_number_length and
-                (self.max_number_length is None or len(clean_num) <= self.max_number_length)
+                (self.max_number_length is None or len(clean_num) <= self.max_number_length))
 
     def _remove_duplicates(self, numbers: List[str]) -> List[str]:
         """Remove duplicates while preserving order"""
@@ -301,4 +301,4 @@ def main():
             st.warning("No numbers extracted from the PDF.")
 
 if __name__ == "__main__":
-    main() 
+    main()
