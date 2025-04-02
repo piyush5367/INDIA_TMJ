@@ -8,12 +8,11 @@ from typing import Dict, List, Optional
 import gc
 from concurrent.futures import ThreadPoolExecutor
 
-# Initialize session state early
-if 'initialized' not in st.session_state:
+# Initialize session state properly at the very beginning
+if not hasattr(st.session_state, 'initialized'):
     st.session_state.initialized = True
     st.session_state.progress = 0
-    st.session_state.current_page = 0
-    st.session_state.total_pages = 0
+    st.session_state.extracted_data = None
 
 # Configure logging (original)
 logging.basicConfig(filename="pdf_extraction.log", level=logging.INFO, 
@@ -191,8 +190,8 @@ class TMJNumberExtractor:
         
         try:
             with pdfplumber.open(pdf_file) as pdf:
-                st.session_state.total_pages = len(pdf.pages)
-                if not st.session_state.total_pages:
+                total_pages = len(pdf.pages)
+                if not total_pages:
                     return results
                 
                 progress_bar = st.progress(0)
@@ -201,24 +200,24 @@ class TMJNumberExtractor:
                 # Process in batches
                 with ThreadPoolExecutor() as executor:
                     futures = []
-                    for i in range(0, st.session_state.total_pages, self.batch_size):
+                    for i in range(0, total_pages, self.batch_size):
                         batch = pdf.pages[i:i + self.batch_size]
-                        futures.append((i, executor.submit(
+                        futures.append(executor.submit(
                             lambda pages: [self.process_page(p) for p in pages], 
                             batch
-                        )))
+                        ))
                     
-                    for i, future in futures:
+                    for i, future in enumerate(futures):
                         batch_results = future.result()
                         for result in batch_results:
                             for key in results:
                                 results[key].extend(result[key])
                         
                         # Update progress
-                        st.session_state.current_page = min(i + self.batch_size, st.session_state.total_pages)
-                        progress = st.session_state.current_page / st.session_state.total_pages
+                        progress = min((i + 1) * self.batch_size / total_pages, 1.0)
                         progress_bar.progress(progress)
-                        status_text.text(f"Processed {st.session_state.current_page}/{st.session_state.total_pages} pages")
+                        current_page = min((i + 1) * self.batch_size, total_pages)
+                        status_text.text(f"Processed {current_page}/{total_pages} pages ({(progress*100):.1f}%)")
                         
                         # Manual garbage collection
                         del batch_results
@@ -254,13 +253,9 @@ class TMJNumberExtractor:
             st.error(f"Excel generation error: {str(e)}")
             return None
 
-# Original UI with ALL enhancements
+# Your original UI with ALL enhancements
 def main():
     st.set_page_config(page_title="TMJ Extractor", layout="wide")
-    
-    # Initialize session state
-    if 'extracted_data' not in st.session_state:
-        st.session_state.extracted_data = None
     
     # Your original enhanced CSS
     st.markdown("""
@@ -352,14 +347,15 @@ def main():
         extractor = TMJNumberExtractor()
         
         with st.spinner("Analyzing document... This may take several minutes for large files"):
-            st.session_state.extracted_data = extractor.process_pdf(uploaded_file)
+            extracted_data = extractor.process_pdf(uploaded_file)
+            st.session_state.extracted_data = extracted_data
             
-            if st.session_state.extracted_data and any(st.session_state.extracted_data.values()):
+            if extracted_data and any(extracted_data.values()):
                 st.success("Extraction completed successfully!")
                 
                 # Original tabs display
-                tabs = st.tabs(list(st.session_state.extracted_data.keys()))
-                for tab, (category, numbers) in zip(tabs, st.session_state.extracted_data.items()):
+                tabs = st.tabs(list(extracted_data.keys()))
+                for tab, (category, numbers) in zip(tabs, extracted_data.items()):
                     with tab:
                         if numbers:
                             st.write(f"Found {len(numbers):,} {category} numbers")  
@@ -370,7 +366,7 @@ def main():
                             st.info(f"No {category} numbers found.")
                 
                 # Original download button
-                if excel_data := extractor.save_to_excel(st.session_state.extracted_data):
+                if excel_data := extractor.save_to_excel(extracted_data):
                     excel_size = len(excel_data) / (1024 * 1024)
                     st.download_button(
                         label=f"📥 Download Excel File ({excel_size:.2f} MB)",
