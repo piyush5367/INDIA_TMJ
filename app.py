@@ -215,16 +215,26 @@ class TMJNumberExtractor:
                     df.to_excel(writer, index=False, sheet_name=sheet_name[:31])
         output.seek(0)
         return output.getvalue()
-
+      
 def main():
     """Streamlit application"""
     st.set_page_config(page_title="Number Extractor")
 
-    # Apply custom styling
+    # Apply custom styling with black background
     st.markdown(
         """
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Zen+Antique+Soft&display=swap');
+
+        /* Set black background for the entire app */
+        body {
+            background-color: #000000;
+            color: #FFFFFF;
+        }
+        .stApp {
+            background-color: #000000;
+            color: #FFFFFF;
+        }
 
         .custom-title {
             font-family: 'Zen Antique Soft', serif;
@@ -236,13 +246,18 @@ def main():
             -webkit-text-fill-color: transparent;
             margin-top: -20px;
         }
+
+        /* Ensure text and elements are visible on black background */
+        p, h1, h2, h3, h4, h5, h6, div, span, label {
+            color: #FFFFFF;
+        }
         </style>
         """,
         unsafe_allow_html=True
     )
 
     # Display the title
-    st.markdown('<p class="custom-title">INDIA TMJ</p>', unsafe_allow_html=True)
+    st.markdown('<p class="custom-title">INDIA TMJ</p>', unsafe_allow_html=True)True)
 
     # File upload
     uploaded_file = st.file_uploader("Upload PDF", type=["pdf"], 
