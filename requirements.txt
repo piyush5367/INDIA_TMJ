@@ -1,27 +1,28 @@
-# Core Dependencies (pinned stable versions)
+# Core Application
 streamlit==1.29.0
-pdfplumber==0.10.3
 pandas==2.1.4
 openpyxl==3.1.2
-python-docx==0.8.11  # Downgraded for compatibility
 
-# PDF Processing
+# PDF Processing (stable combination)
+pdfplumber==0.10.3
 pdfminer.six==20221105
-Pillow==10.1.0
-pycryptodome==3.19.0
+Pillow==9.5.0  # Stable version for PDF processing
 
-# Supporting Libraries
+# Document Handling
+python-docx==0.8.11  # Compatible version
+
+# System Dependencies
 numpy==1.26.2
-protobuf==4.25.6
+protobuf==3.20.3  # Specific working version
+pycryptodome==3.19.0
 tqdm==4.66.1
-click==8.1.8
 
-# System Tools
-psutil==5.9.8
+# Runtime Support
 typing-extensions==4.8.0
-python-dateutil==2.9.0
-pytz==2025.2
+python-dateutil==2.8.2
+pytz==2023.3.post1
 six==1.16.0
+click==8.1.7
 
 # Memory Management
-gc-collect==0.1.0
+psutil==5.9.5
