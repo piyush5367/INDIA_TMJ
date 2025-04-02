@@ -3,18 +3,15 @@ import pdfplumber
 import pandas as pd
 import streamlit as st
 import logging
-import psutil
-import os
 from io import BytesIO
 from typing import Dict, List, Optional
-from functools import partial
 
 # Configure logging
 logging.basicConfig(filename="pdf_extraction.log", level=logging.INFO, 
                    format="%(asctime)s - %(message)s")
 
 class TMJNumberExtractor:
-    """Extracts numbers from Trade Marks Journal PDFs with large file support"""
+    """Extracts numbers from Trade Marks Journal PDFs"""
     
     def __init__(self):
         # Configure section markers (case insensitive)
@@ -43,15 +40,6 @@ class TMJNumberExtractor:
         
         # Configure logging
         self.logger = logging.getLogger(__name__)
-        
-        # Memory management
-        self.memory_limit = 0.8  # 80% of available memory
-        self.chunk_size = 10  # Pages to process at a time
-
-    def _check_memory(self):
-        """Check if memory usage is within safe limits"""
-        mem = psutil.virtual_memory()
-        return mem.percent < (self.memory_limit * 100)
 
     def _clean_number(self, number: str) -> str:
         """Clean extracted number by removing non-digit characters"""
@@ -66,7 +54,7 @@ class TMJNumberExtractor:
             return False
         return (clean_num.isdigit() and 
                 len(clean_num) >= self.min_number_length and
-                (self.max_number_length is None or len(clean_num) <= self.max_number_length))
+                (self.max_number_length is None or len(clean_num) <= self.max_number_length)
 
     def _remove_duplicates(self, numbers: List[str]) -> List[str]:
         """Remove duplicates while preserving order"""
@@ -79,24 +67,6 @@ class TMJNumberExtractor:
             return []
         matches = re.findall(pattern, text)
         return [m for m in matches if self._validate_number(m)]
-
-    def _process_section(self, text: str, section: str) -> List[str]:
-        """Generic section processor with memory check"""
-        if not self._check_memory():
-            self.logger.warning("Memory threshold reached during section processing")
-            return []
-            
-        if section == 'advertisement':
-            return self.extract_advertisement_numbers(text)
-        elif section == 'corrigenda':
-            return self.extract_corrigenda_numbers(text)
-        elif section == 'rc':
-            return self.extract_rc_numbers(text)
-        elif section == 'renewal':
-            return self.extract_renewal_numbers(text)
-        elif section == 'pr_section':
-            return self.extract_pr_section_numbers(text)
-        return []
 
     def extract_advertisement_numbers(self, text: str) -> List[str]:
         """Extract advertisement numbers before corrigenda section"""
@@ -201,9 +171,8 @@ class TMJNumberExtractor:
                 
         return self._remove_duplicates(numbers)
 
-    @st.cache_resource(max_entries=3, show_spinner=False)
-    def process_pdf(_self, pdf_file) -> Dict[str, List[str]]:
-        """Process PDF in chunks and return all extracted numbers"""
+    def process_pdf(self, pdf_file) -> Dict[str, List[str]]:
+        """Process PDF and return all extracted numbers"""
         extracted_data = {
             'advertisement': [],
             'corrigenda': [],
@@ -215,42 +184,23 @@ class TMJNumberExtractor:
         if not pdf_file:
             return extracted_data
 
-        try:
-            with pdfplumber.open(pdf_file) as pdf:
-                total_pages = len(pdf.pages)
-                if total_pages == 0:
-                    return extracted_data
+        with pdfplumber.open(pdf_file) as pdf:
+            total_pages = len(pdf.pages)
+            if total_pages == 0:
+                return extracted_data
 
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                
-                # Process in chunks
-                for chunk_start in range(0, total_pages, _self.chunk_size):
-                    if not _self._check_memory():
-                        status_text.warning("Memory limit reached, processing stopped")
-                        _self.logger.error("Memory limit reached during PDF processing")
-                        break
-                        
-                    chunk_end = min(chunk_start + _self.chunk_size, total_pages)
-                    status_text.text(f"Processing pages {chunk_start+1}-{chunk_end} of {total_pages}")
-                    
-                    for i in range(chunk_start, chunk_end):
-                        page = pdf.pages[i]
-                        text = page.extract_text() or ""
-                        
-                        for section in extracted_data:
-                            extracted_data[section].extend(
-                                _self._process_section(text, section)
-                            
-                        progress_bar.progress((i + 1) / total_pages)
-                        
-        except Exception as e:
-            _self.logger.error(f"PDF processing error: {str(e)}")
-            st.error(f"Error processing PDF: {str(e)}")
-            return extracted_data
+            progress_bar = st.progress(0)
+            for i, page in enumerate(pdf.pages):
+                text = page.extract_text() or ""
+                extracted_data['advertisement'].extend(self.extract_advertisement_numbers(text))
+                extracted_data['corrigenda'].extend(self.extract_corrigenda_numbers(text))
+                extracted_data['rc'].extend(self.extract_rc_numbers(text))
+                extracted_data['renewal'].extend(self.extract_renewal_numbers(text))
+                extracted_data['pr_section'].extend(self.extract_pr_section_numbers(text))
+                progress_bar.progress((i + 1) / total_pages)
 
         for key in extracted_data:
-            extracted_data[key] = _self._remove_duplicates(extracted_data[key])
+            extracted_data[key] = self._remove_duplicates(extracted_data[key])
             
         return extracted_data
 
@@ -267,7 +217,7 @@ class TMJNumberExtractor:
         return output.getvalue()
 
 def main():
-    """Streamlit application with memory awareness"""
+    """Streamlit application"""
     st.set_page_config(page_title="Number Extractor")
 
     # Apply custom styling with black background
@@ -309,30 +259,22 @@ def main():
     # Display the title
     st.markdown('<p class="custom-title">INDIA TMJ</p>', unsafe_allow_html=True)
 
-    # File upload with size warning
+    # File upload
     uploaded_file = st.file_uploader("Upload PDF", type=["pdf"], 
-                                   help="Upload Trade Marks Journal PDF (max 500MB recommended)")
+                                   help="Upload Trade Marks Journal PDF")
     
     if uploaded_file is not None:
-        file_size = len(uploaded_file.getvalue()) / (1024 * 1024)  # in MB
-        if file_size > 500:
-            st.warning("Large PDF detected (>500MB). Processing may take longer and use more memory.")
-        
-        st.write(f"Processing: **{uploaded_file.name}** (Size: {file_size:.2f} MB)")
+        st.write(f"Processing: **{uploaded_file.name}**")
         
         # Initialize extractor
         extractor = TMJNumberExtractor()
         
-        with st.spinner("Analyzing document..."):
+        with st.spinner("Analyze your document..."):
             extracted_data = extractor.process_pdf(uploaded_file)
             excel_data = extractor.save_to_excel(extracted_data)
         
         if any(extracted_data.values()):
             st.success("Extraction completed successfully!")
-            
-            # Display memory usage
-            mem = psutil.virtual_memory()
-            st.caption(f"Memory usage: {mem.percent}%")
             
             # Display results in tabs
             tabs = st.tabs(list(extracted_data.keys()))
