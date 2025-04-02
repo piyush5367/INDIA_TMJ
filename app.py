@@ -31,7 +31,7 @@ class TMJNumberExtractor:
                 r'\b(\d{5,})\b',
                 r'Application No\s+(\d{5,})'
             ],
-            'pr_section': r'(\d{5,})\s*-'  # Fixed: Added missing opening parenthesis
+            'pr_section': r'(\d{5,})\s*-'
         }
         
         # Validation rules
@@ -45,7 +45,6 @@ class TMJNumberExtractor:
         """Clean extracted number by removing non-digit characters"""
         if not isinstance(number, str):
             return ""
-        # Remove commas, spaces, and other non-digit characters
         return re.sub(r"[^\d]", "", number)
 
     def _validate_number(self, number: str) -> bool:
@@ -66,13 +65,8 @@ class TMJNumberExtractor:
         """Generic number extractor with validation"""
         if not text or not isinstance(text, str):
             return []
-            
-        try:
-            matches = re.findall(pattern, text)
-            return [m for m in matches if self._validate_number(m)]
-        except Exception as e:
-            self.logger.error(f"Regex error with pattern {pattern}: {e}")
-            return []
+        matches = re.findall(pattern, text)
+        return [m for m in matches if self._validate_number(m)]
 
     def extract_advertisement_numbers(self, text: str) -> List[str]:
         """Extract advertisement numbers before corrigenda section"""
@@ -188,34 +182,23 @@ class TMJNumberExtractor:
         }
         
         if not pdf_file:
-            st.error("No file uploaded.")
             return extracted_data
 
-        try:
-            with pdfplumber.open(pdf_file) as pdf:
-                total_pages = len(pdf.pages)
-                if total_pages == 0:
-                    st.warning("PDF is empty.")
-                    return extracted_data
+        with pdfplumber.open(pdf_file) as pdf:
+            total_pages = len(pdf.pages)
+            if total_pages == 0:
+                return extracted_data
 
-                progress_bar = st.progress(0)
-                for i, page in enumerate(pdf.pages):
-                    try:
-                        text = page.extract_text() or ""
-                        extracted_data['advertisement'].extend(self.extract_advertisement_numbers(text))
-                        extracted_data['corrigenda'].extend(self.extract_corrigenda_numbers(text))
-                        extracted_data['rc'].extend(self.extract_rc_numbers(text))
-                        extracted_data['renewal'].extend(self.extract_renewal_numbers(text))
-                        extracted_data['pr_section'].extend(self.extract_pr_section_numbers(text))
-                        progress_bar.progress((i + 1) / total_pages)
-                    except Exception as e:
-                        logging.error(f"Page {i+1} processing error: {e}")
-                        continue
-        except Exception as e:
-            st.error(f"Failed to process PDF: {e}")
-            logging.error(f"PDF processing error: {e}")
-        
-        # Deduplicate across all pages
+            progress_bar = st.progress(0)
+            for i, page in enumerate(pdf.pages):
+                text = page.extract_text() or ""
+                extracted_data['advertisement'].extend(self.extract_advertisement_numbers(text))
+                extracted_data['corrigenda'].extend(self.extract_corrigenda_numbers(text))
+                extracted_data['rc'].extend(self.extract_rc_numbers(text))
+                extracted_data['renewal'].extend(self.extract_renewal_numbers(text))
+                extracted_data['pr_section'].extend(self.extract_pr_section_numbers(text))
+                progress_bar.progress((i + 1) / total_pages)
+
         for key in extracted_data:
             extracted_data[key] = self._remove_duplicates(extracted_data[key])
             
@@ -223,98 +206,84 @@ class TMJNumberExtractor:
 
     def save_to_excel(self, data_dict: Dict[str, List[str]]) -> Optional[bytes]:
         """Generate Excel file from extracted data"""
-        try:
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                for sheet_name, numbers in data_dict.items():
-                    if numbers:
-                        try:
-                            # Clean numbers by removing commas before saving to Excel
-                            clean_numbers = [int(self._clean_number(n)) for n in numbers]
-                            df = pd.DataFrame(sorted(set(clean_numbers)), columns=["Numbers"])
-                            df.to_excel(writer, index=False, sheet_name=sheet_name[:31])
-                        except Exception as e:
-                            logging.error(f"Error writing {sheet_name} to Excel: {e}")
-                            continue
-            output.seek(0)
-            return output.getvalue()
-        except Exception as e:
-            st.error(f"Failed to create Excel file: {e}")
-            logging.error(f"Excel error: {e}")
-            return None
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            for sheet_name, numbers in data_dict.items():
+                if numbers:
+                    clean_numbers = [int(self._clean_number(n)) for n in numbers]
+                    df = pd.DataFrame(sorted(set(clean_numbers)), columns=["Numbers"])
+                    df.to_excel(writer, index=False, sheet_name=sheet_name[:31])
+        output.seek(0)
+        return output.getvalue()
 
 def main():
     """Streamlit application"""
-    try:
-        st.set_page_config(page_title="TMJ Number Extractor")
-        st.markdown(
-    """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&display=swap');
-    
-    .custom-title {
-        font-family: 'DM Serif Display', serif;
-        text-align: center;
-        font-size: 3em;
-        color: #000000;
-        margin-top: -20px;  /* Adjust spacing if needed */
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+    st.set_page_config(page_title="Number Extractor")
 
-        # Display the title
-        st.markdown('<p class="custom-title">INDIA TMJ</p>', unsafe_allow_html=True)
+    # Apply custom styling
+    st.markdown(
+        """
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Zen+Antique+Soft&display=swap');
+
+        .custom-title {
+            font-family: 'Zen Antique Soft', serif;
+            text-align: center;
+            font-size: 3em;
+            font-weight: bold;
+            background: linear-gradient(to right, #FF9933, #FFFFFF, #138808);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-top: -20px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Display the title
+    st.markdown('<p class="custom-title">INDIA TMJ</p>', unsafe_allow_html=True)
+
+    # File upload
+    uploaded_file = st.file_uploader("Upload PDF", type=["pdf"], 
+                                   help="Upload Trade Marks Journal PDF")
+    
+    if uploaded_file is not None:
+        st.write(f"Processing: **{uploaded_file.name}**")
         
-        # File upload
-        uploaded_file = st.file_uploader("Upload PDF", type=["pdf"], 
-                                       help="Upload Trade Marks Journal PDF")
+        # Initialize extractor
+        extractor = TMJNumberExtractor()
         
-        if uploaded_file is not None:
-            st.write(f"Processing: **{uploaded_file.name}**")
+        with st.spinner("Analyze your document..."):
+            extracted_data = extractor.process_pdf(uploaded_file)
+            excel_data = extractor.save_to_excel(extracted_data)
+        
+        if any(extracted_data.values()):
+            st.success("Extraction completed successfully!")
             
-            # Initialize extractor
-            extractor = TMJNumberExtractor()
+            # Display results in tabs
+            tabs = st.tabs(list(extracted_data.keys()))
+            for tab, (category, numbers) in zip(tabs, extracted_data.items()):
+                with tab:
+                    if numbers:
+                        st.write(f"Found {len(numbers):.0f} {category} numbers")  
+                        clean_numbers = [int(extractor._clean_number(n)) for n in numbers]
+                        df = pd.DataFrame(sorted(set(clean_numbers)), 
+                                        columns=["Numbers"])
+                        st.dataframe(df, use_container_width=True, height=200)
+                    else:
+                        st.info(f"No {category} numbers found.")
             
-            with st.spinner("Analyzing your document..."):
-                extracted_data = extractor.process_pdf(uploaded_file)
-                excel_data = extractor.save_to_excel(extracted_data)
-            
-            if any(extracted_data.values()):
-                st.success("Extraction completed successfully!")
-                
-                # Display results in tabs
-                tabs = st.tabs(list(extracted_data.keys()))
-                for tab, (category, numbers) in zip(tabs, extracted_data.items()):
-                    with tab:
-                        if numbers:
-                            st.write(f"Found {len(numbers)} {category} numbers")  
-                            try:
-                                # Display cleaned numbers without commas
-                                clean_numbers = [int(extractor._clean_number(n)) for n in numbers]
-                                df = pd.DataFrame(sorted(set(clean_numbers)), 
-                                                columns=["Numbers"])
-                                st.dataframe(df, use_container_width=True, height=200)
-                            except Exception as e:
-                                st.warning(f"Error displaying {category} data: {e}")
-                        else:
-                            st.info(f"No {category} numbers found.")
-                
-                # Download button
-                if excel_data:
-                    st.download_button(
-                        label="📥 Download Excel File",
-                        data=excel_data,
-                        file_name=f"tmj_numbers_{uploaded_file.name.split('.')[0]}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-            else:
-                st.warning("No numbers extracted from the PDF.")
-                
-    except Exception as e:
-        st.error(f"Application error: {e}")
-        logging.error(f"Application error: {e}")
+            # Download button
+            if excel_data:
+                st.download_button(
+                    label="📥 Download Excel File",
+                    data=excel_data,
+                    file_name=f"tmj_numbers_{uploaded_file.name.split('.')[0]}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+        else:
+            st.warning("No numbers extracted from the PDF.")
 
 if __name__ == "__main__":
     main()
