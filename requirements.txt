@@ -1,8 +1,23 @@
-pdfplumber==0.11.0
-pandas==2.2.2
-streamlit==1.33.0
-openpyxl==3.1.2
-python-docx==1.1.0
-Pillow==10.3.0
-numpy==1.26.2
-tqdm==4.66.1
+# Core Requirements
+streamlit==1.29.0  # Pinned to stable version
+pdfplumber==0.10.3  # Stable PDF processing
+pandas==2.1.4  # Data processing
+openpyxl==3.1.2  # Excel export
+python-docx==1.1.0  # Document processing
+
+# Supporting Libraries
+Pillow==10.1.0  # Image processing
+numpy==1.26.2  # Numerical operations
+pdfminer.six==20221105  # PDF parsing
+pycryptodome==3.19.0  # Encryption support
+
+# Performance & Utilities
+tqdm==4.66.1  # Progress bars
+concurrent-log-handler==0.9.24  # Thread-safe logging
+protobuf==4.25.6  # Protocol buffers
+
+# Version Pinning for Stability
+click==8.1.8
+typing-extensions==4.8.0
+python-dateutil==2.9.0.post0
+pytz==2025.2
