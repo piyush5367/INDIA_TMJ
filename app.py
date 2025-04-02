@@ -213,7 +213,7 @@ class TMJNumberExtractor:
                     
                     # Update progress and clean memory
                     progress = (i + 1) / total_pages
-                    progress_bar.progress(progress)
+                    progress_bar.progress(progress, text=f"Processing page {i+1} of {total_pages}")
                     status_text.text(f"Processed page {i+1}/{total_pages} ({(progress*100):.1f}%)")
                     
                     # Explicitly clean up
@@ -256,16 +256,16 @@ class TMJNumberExtractor:
             gc.collect()
 
 def main():
-    """Streamlit application with enhanced UI"""
+    """Streamlit application with enhanced UI visibility"""
     st.set_page_config(page_title="Number Extractor", layout="wide")
 
-    # Apply custom styling with improved dark blue theme
+    # Apply custom styling with improved visibility
     st.markdown(
         """
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Zen+Antique+Soft&display=swap');
 
-        /* Dark blue background for the entire app */
+        /* Dark blue background for better contrast */
         body {
             background-color: #0a1128;
             color: #FFFFFF;
@@ -275,22 +275,23 @@ def main():
             color: #FFFFFF;
         }
 
-        /* Enhanced title with border and glow effect */
+        /* Enhanced title with more visible gradient */
         .custom-title {
             font-family: 'Zen Antique Soft', serif;
             text-align: center;
             font-size: 3.5em;
             font-weight: bold;
-            background: linear-gradient(to right, #FF9933, #FFFFFF, #138808);
+            background: linear-gradient(to right, #FF5733, #FFC300, #DAF7A6);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin: 20px 0;
             padding: 15px;
-            border: 3px solid #1a4b8c;
+            border: 3px solid #2a5c9c;
             border-radius: 10px;
-            box-shadow: 0 0 15px rgba(26, 75, 140, 0.7);
+            box-shadow: 0 0 20px rgba(42, 92, 156, 0.8);
             display: inline-block;
             width: 100%;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
         }
 
         /* Container for centering the title */
@@ -299,35 +300,68 @@ def main():
             justify-content: center;
             width: 100%;
             margin-bottom: 30px;
+            background: rgba(10, 17, 40, 0.7);
+            padding: 10px;
+            border-radius: 10px;
         }
 
         /* Improved visibility for all text elements */
         p, h1, h2, h3, h4, h5, h6, div, span, label {
-            color: #FFFFFF;
+            color: #FFFFFF !important;
+        }
+        
+        /* Light green progress bar */
+        .stProgress > div > div > div {
+            background-color: #90EE90 !important;
         }
         
         /* Enhanced dataframe styling */
         .stDataFrame {
             max-height: 400px;
             overflow: auto;
-            border: 1px solid #1a4b8c;
+            border: 1px solid #2a5c9c;
             border-radius: 5px;
+            background-color: #0a1128;
         }
         
-        /* Better button styling */
+        /* Better button styling with visible text */
         .stDownloadButton>button {
             background: linear-gradient(to right, #1a4b8c, #2a5c9c);
-            color: white;
+            color: white !important;
             border: 1px solid #3d7bb3;
             border-radius: 5px;
             padding: 8px 16px;
+            font-weight: bold;
         }
         
-        /* File uploader styling */
+        /* File uploader styling with visible text */
         .stFileUploader>div>div {
-            border: 2px dashed #1a4b8c;
+            border: 2px dashed #2a5c9c;
             border-radius: 5px;
-            background-color: rgba(26, 75, 140, 0.1);
+            background-color: rgba(42, 92, 156, 0.2);
+            color: white !important;
+        }
+        
+        .stFileUploader label {
+            color: white !important;
+            font-weight: bold;
+        }
+        
+        /* Tab styling */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 10px;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            background: #1a4b8c;
+            color: white;
+            border-radius: 5px 5px 0 0;
+            padding: 8px 16px;
+        }
+        
+        .stTabs [aria-selected="true"] {
+            background: #2a5c9c;
+            color: white;
         }
         </style>
         """,
